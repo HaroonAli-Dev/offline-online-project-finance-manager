@@ -1,0 +1,44 @@
+name: offline_finance_management_app
+description: "Offline-first finance and construction management application."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.6.1
+  drift: ^2.28.0
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  uuid: ^4.5.0
+  intl: ^0.20.2
+  drift_flutter: ^0.2.8
+  sqlite3: ^2.9.4
+  shared_preferences: ^2.3.5
+  file_picker: ^8.1.7
+  image_picker:
+  image:
+  geolocator:
+  flutter_local_notifications:
+  supabase_flutter:
+  pdf:
+  printing:
+  csv: ^6.0.0
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  build_runner: ^2.5.0
+  drift_dev: ^2.28.0
+
+flutter:
+  uses-material-design: true
