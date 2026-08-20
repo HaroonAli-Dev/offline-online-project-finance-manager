@@ -453,6 +453,44 @@ void main() {
     expect(items.single.filePath, isNull);
   });
 
+  test('stores file metadata and valid GPS coordinates', () async {
+    final id = await repo.createAttachment(
+      entityType: 'site',
+      entityId: 'site-1',
+      fileName: 'inspection.jpg',
+      mimeType: 'image/jpeg',
+      fileSize: 2048,
+      imageWidth: 1920,
+      imageHeight: 1080,
+      capturedAt: DateTime.utc(2026, 8, 19),
+      latitude: 31.5204,
+      longitude: 74.3587,
+    );
+
+    final attachment =
+        (await repo.watchByEntity('site', 'site-1').first).single;
+    expect(attachment.id, id);
+    expect(attachment.fileSize, 2048);
+    expect(attachment.imageWidth, 1920);
+    expect(attachment.imageHeight, 1080);
+    expect(attachment.hasGps, isTrue);
+  });
+
+  test('rejects incomplete or out-of-range GPS coordinates', () async {
+    expect(
+      () => repo.createAttachment(
+        entityType: 'site',
+        entityId: 'site-1',
+        fileName: 'inspection.jpg',
+        capturedAt: DateTime.utc(2026, 8, 19),
+        latitude: 91,
+        longitude: 74,
+      ),
+      throwsArgumentError,
+    );
+    expect(AttachmentsRepository.hasValidCoordinates(31, null), isFalse);
+  });
+
   // --------------------------------------------------------------------------
   // 18. Site entity type
   // --------------------------------------------------------------------------

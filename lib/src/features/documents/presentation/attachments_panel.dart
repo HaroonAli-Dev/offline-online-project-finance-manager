@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/file_launcher_service.dart';
+import '../../../core/services/location_service.dart';
+import '../data/attachment_local_storage.dart';
 import '../data/attachment_picker_service.dart';
+import '../data/image_compression_service.dart';
 import '../domain/attachment_model.dart';
 import 'attachments_providers.dart';
 
@@ -37,10 +40,28 @@ class AttachmentsPanel extends ConsumerWidget {
             const SizedBox(width: 6),
             Text('Attachments', style: Theme.of(context).textTheme.titleSmall),
             const Spacer(),
-            TextButton.icon(
-              onPressed: () => _addAttachment(context, ref),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add'),
+            PopupMenuButton<_AttachmentSource>(
+              tooltip: 'Add attachment',
+              onSelected: (source) => _addAttachment(context, ref, source),
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: _AttachmentSource.file,
+                  child: Text('Choose document/file'),
+                ),
+                PopupMenuItem(
+                  value: _AttachmentSource.gallery,
+                  child: Text('Choose photo'),
+                ),
+                PopupMenuItem(
+                  value: _AttachmentSource.camera,
+                  child: Text('Take photo'),
+                ),
+              ],
+              child: TextButton.icon(
+                onPressed: null,
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add'),
+              ),
             ),
           ],
         ),
@@ -73,8 +94,16 @@ class AttachmentsPanel extends ConsumerWidget {
     );
   }
 
-  Future<void> _addAttachment(BuildContext context, WidgetRef ref) async {
-    final picked = await AttachmentPickerService.pickFile();
+  Future<void> _addAttachment(
+    BuildContext context,
+    WidgetRef ref,
+    _AttachmentSource source,
+  ) async {
+    final picked = switch (source) {
+      _AttachmentSource.file => await AttachmentPickerService.pickFile(),
+      _AttachmentSource.gallery => await AttachmentPickerService.selectPhoto(),
+      _AttachmentSource.camera => await AttachmentPickerService.takePhoto(),
+    };
     if (picked == null || !context.mounted) return;
 
     // Show description + category dialog
@@ -89,12 +118,31 @@ class AttachmentsPanel extends ConsumerWidget {
 
     final repo = ref.read(attachmentsRepositoryProvider);
     try {
+      var bytes = picked.bytes;
+      var fileName = picked.fileName;
+      var mimeType = picked.mimeType;
+      int? width;
+      int? height;
+      if ((mimeType ?? '').startsWith('image/') && bytes != null) {
+        final image = ImageCompressionService.process(bytes);
+        bytes = image.bytes;
+        mimeType = image.mimeType;
+        fileName = '${fileName.split('.').first}.jpg';
+        width = image.width;
+        height = image.height;
+      }
+      final storedPath = bytes == null
+          ? picked.filePath
+          : await saveAttachmentLocally(bytes, fileName);
       await repo.createAttachment(
         entityType: entityType,
         entityId: entityId,
-        filePath: picked.filePath,
-        fileName: picked.fileName,
-        mimeType: picked.mimeType,
+        filePath: storedPath,
+        fileName: fileName,
+        mimeType: mimeType,
+        fileSize: bytes?.length ?? picked.size,
+        imageWidth: width,
+        imageHeight: height,
         category: input.category,
         description: input.description,
         capturedAt: DateTime.now().toUtc(),
@@ -233,6 +281,7 @@ class _AttachmentInputDialogState extends State<_AttachmentInputDialog> {
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
   String _category = 'other';
+  bool _gettingLocation = false;
 
   @override
   void initState() {
@@ -325,6 +374,20 @@ class _AttachmentInputDialogState extends State<_AttachmentInputDialog> {
                 ),
               ],
             ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _gettingLocation ? null : _captureLocation,
+                icon: _gettingLocation
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.my_location),
+                label: const Text('Use current location'),
+              ),
+            ),
           ],
         ),
       ),
@@ -352,4 +415,21 @@ class _AttachmentInputDialogState extends State<_AttachmentInputDialog> {
       ],
     );
   }
+
+  Future<void> _captureLocation() async {
+    setState(() => _gettingLocation = true);
+    final result = await LocationService.currentLocation();
+    if (!mounted) return;
+    setState(() => _gettingLocation = false);
+    if (result.isSuccess) {
+      _latController.text = result.latitude!.toStringAsFixed(6);
+      _lngController.text = result.longitude!.toStringAsFixed(6);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message ?? 'Location is unavailable.')),
+      );
+    }
+  }
 }
+
+enum _AttachmentSource { file, gallery, camera }

@@ -12,6 +12,9 @@ class ReminderModel {
     this.schemeName,
     this.siteId,
     this.siteName,
+    this.relatedEntityType,
+    this.relatedEntityId,
+    this.relatedEntityName,
     this.remarks,
     required this.createdAt,
   });
@@ -29,6 +32,9 @@ class ReminderModel {
   final String? schemeName;
   final String? siteId;
   final String? siteName;
+  final String? relatedEntityType;
+  final String? relatedEntityId;
+  final String? relatedEntityName;
   final String? remarks;
   final DateTime createdAt;
 

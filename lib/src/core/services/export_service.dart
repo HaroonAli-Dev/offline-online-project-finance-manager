@@ -51,7 +51,7 @@ class ExportService {
       ]);
     }
 
-    final csvData = const ListToCsvConverter().convert(rows);
+    final csvData = Csv().encode(rows);
     final fileName =
         'transactions_report_${DateTime.now().millisecondsSinceEpoch}.csv';
 
@@ -65,17 +65,18 @@ class ExportService {
       return 'Downloaded via browser';
     }
 
-    final result = await FilePicker.platform.saveFile(
+    final result = await FilePicker.saveFile(
       dialogTitle: 'Save Transactions CSV Report',
       fileName: fileName,
+      bytes: Uint8List.fromList(utf8.encode(csvData)),
+      mimeType: 'text/csv',
       type: FileType.custom,
       allowedExtensions: ['csv'],
     );
 
     if (result == null) return null;
 
-    await writeStringToFile(result, csvData);
-    return result;
+    return result.toFilePath();
   }
 
   /// Export Expenses to CSV file via FilePicker / Web Blob Download
@@ -110,7 +111,7 @@ class ExportService {
       ]);
     }
 
-    final csvData = const ListToCsvConverter().convert(rows);
+    final csvData = Csv().encode(rows);
     final fileName =
         'expenses_report_${DateTime.now().millisecondsSinceEpoch}.csv';
 
@@ -124,17 +125,18 @@ class ExportService {
       return 'Downloaded via browser';
     }
 
-    final result = await FilePicker.platform.saveFile(
+    final result = await FilePicker.saveFile(
       dialogTitle: 'Save Expenses CSV Report',
       fileName: fileName,
+      bytes: Uint8List.fromList(utf8.encode(csvData)),
+      mimeType: 'text/csv',
       type: FileType.custom,
       allowedExtensions: ['csv'],
     );
 
     if (result == null) return null;
 
-    await writeStringToFile(result, csvData);
-    return result;
+    return result.toFilePath();
   }
 
   /// Backup database file to a location chosen by user
@@ -157,17 +159,17 @@ class ExportService {
       throw Exception('Database file not found yet.');
     }
 
-    final result = await FilePicker.platform.saveFile(
+    final result = await FilePicker.saveFile(
       dialogTitle: 'Save Backup Copy of Database',
       fileName:
           'finance_construction_backup_${DateTime.now().millisecondsSinceEpoch}.sqlite',
+      bytes: Uint8List.fromList(await readFileAsBytes(sourcePath)),
       type: FileType.any,
     );
 
     if (result == null) return null;
 
-    await copyFileTo(sourcePath, result);
-    return result;
+    return result.toFilePath();
   }
 
   /// Restore database from selected sqlite backup file
@@ -176,14 +178,14 @@ class ExportService {
       throw Exception('Database restore is not supported on Web browser.');
     }
 
-    final result = await FilePicker.platform.pickFiles(
+    final files = await FilePicker.pickFiles(
       dialogTitle: 'Select Backup Database File (.sqlite)',
       type: FileType.any,
     );
 
-    if (result == null || result.files.single.path == null) return false;
+    if (files.length != 1 || files.single.path == null) return false;
 
-    final selectedPath = result.files.single.path!;
+    final selectedPath = files.single.path!;
     final appDocDir = await getApplicationDocumentsDirectory();
     final targetDbPath = p.join(appDocDir.path, 'finance_construction.sqlite');
 

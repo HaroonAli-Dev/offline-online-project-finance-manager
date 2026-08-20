@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/hint_banner.dart';
+import '../../documents/presentation/entity_attachments_page.dart';
 import '../data/sites_repository.dart';
 import '../domain/site_model.dart';
 import 'site_form_dialog.dart';
@@ -346,12 +347,25 @@ class _SiteCard extends StatelessWidget {
           onSelected: (action) => switch (action) {
             _SiteAction.edit => onEdit(),
             _SiteAction.delete => onDelete(),
+            _SiteAction.attachments => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => EntityAttachmentsPage(
+                  entityType: 'site',
+                  entityId: site.id,
+                  title: site.name,
+                ),
+              ),
+            ),
           },
           itemBuilder: (_) => [
             const PopupMenuItem(value: _SiteAction.edit, child: Text('Edit')),
             const PopupMenuItem(
               value: _SiteAction.delete,
               child: Text('Delete'),
+            ),
+            const PopupMenuItem(
+              value: _SiteAction.attachments,
+              child: Text('Attachments'),
             ),
           ],
         ),
@@ -410,4 +424,4 @@ class _EmptySitesState extends StatelessWidget {
   }
 }
 
-enum _SiteAction { edit, delete }
+enum _SiteAction { edit, delete, attachments }

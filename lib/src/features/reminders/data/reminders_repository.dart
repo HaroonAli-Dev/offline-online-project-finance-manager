@@ -90,6 +90,173 @@ class RemindersRepository {
   // Mutations
   // ---------------------------------------------------------------------------
 
+  Future<ReminderModel?> getById(String id) async {
+    final rows = await _database
+        .customSelect(
+          '''SELECT r.id, r.title, r.description, r.due_at, r.priority,
+                r.is_done, r.done_at, r.scheme_id, sc.name AS scheme_name,
+                r.site_id, st.name AS site_name, r.remarks, r.created_at
+         FROM reminders r
+         LEFT JOIN schemes sc ON sc.id = r.scheme_id AND sc.deleted_at IS NULL
+         LEFT JOIN sites st ON st.id = r.site_id AND st.deleted_at IS NULL
+         WHERE r.id = ? AND r.deleted_at IS NULL''',
+          variables: [Variable.withString(id)],
+          readsFrom: {_database.reminders, _database.schemes, _database.sites},
+        )
+        .get();
+    return rows.isEmpty ? null : _reminderFromRow(rows.single);
+  }
+
+  Stream<List<ReminderModel>> watchRemindersForDate(DateTime date) {
+    final localDate = date.toLocal();
+    final start = DateTime(
+      localDate.year,
+      localDate.month,
+      localDate.day,
+    ).toUtc();
+    return _watchDueBetween(start, start.add(const Duration(days: 1)));
+  }
+
+  Stream<List<ReminderModel>> watchUpcomingReminders({DateTime? from}) {
+    return _watchDueBetween(
+      (from ?? DateTime.now()).toUtc(),
+      null,
+      pendingOnly: true,
+    );
+  }
+
+  Stream<List<ReminderModel>> watchOverdueReminders({DateTime? at}) {
+    return _watchDueQuery('r.due_at < ? AND r.is_done = 0', [
+      Variable.withDateTime((at ?? DateTime.now()).toUtc()),
+    ]);
+  }
+
+  Stream<List<ReminderModel>> _watchDueBetween(
+    DateTime start,
+    DateTime? end, {
+    bool pendingOnly = false,
+  }) {
+    final endClause = end == null ? '' : 'AND r.due_at < ?';
+    final pendingClause = pendingOnly ? 'AND r.is_done = 0' : '';
+    return _watchDueQuery('r.due_at >= ? $endClause $pendingClause', [
+      Variable.withDateTime(start),
+      if (end != null) Variable.withDateTime(end),
+    ]);
+  }
+
+  Stream<List<ReminderModel>> _watchDueQuery(
+    String predicate,
+    List<Variable<Object>> variables,
+  ) {
+    return _database
+        .customSelect(
+          '''SELECT r.id, r.title, r.description, r.due_at, r.priority,
+                r.is_done, r.done_at, r.scheme_id, sc.name AS scheme_name,
+                r.site_id, st.name AS site_name, r.remarks, r.created_at
+         FROM reminders r
+         LEFT JOIN schemes sc ON sc.id = r.scheme_id AND sc.deleted_at IS NULL
+         LEFT JOIN sites st ON st.id = r.site_id AND st.deleted_at IS NULL
+         WHERE r.deleted_at IS NULL AND $predicate
+         ORDER BY r.due_at ASC, r.created_at ASC, r.id ASC''',
+          variables: variables,
+          readsFrom: {_database.reminders, _database.schemes, _database.sites},
+        )
+        .watch()
+        .map((rows) => rows.map(_reminderFromRow).toList());
+  }
+
+  Future<void> restoreReminder(String id) async {
+    final now = DateTime.now().toUtc();
+    await _database.transaction(() async {
+      await (_database.update(
+        _database.reminders,
+      )..where((r) => r.id.equals(id))).write(
+        RemindersCompanion(
+          deletedAt: const Value(null),
+          updatedAt: Value(now),
+          syncStatus: Value(SyncStatus.pending.databaseValue),
+        ),
+      );
+      await _enqueueChange('reminder', id, 'restore', now);
+    });
+  }
+
+  Future<void> createReminderWithRelationship({
+    required String title,
+    required String entityType,
+    required String entityId,
+    String? description,
+    DateTime? dueAt,
+    String priority = 'medium',
+    String? remarks,
+  }) async {
+    await _ensureEntityExists(entityType, entityId);
+    final now = DateTime.now().toUtc();
+    final reminderId = _uuid.v4();
+    await _database.transaction(() async {
+      await _database
+          .into(_database.reminders)
+          .insert(
+            RemindersCompanion.insert(
+              id: reminderId,
+              title: title.trim(),
+              description: Value(_cleanOptional(description)),
+              dueAt: Value(dueAt?.toUtc()),
+              priority: Value(
+                priority.trim().isEmpty ? 'medium' : priority.trim(),
+              ),
+              remarks: Value(_cleanOptional(remarks)),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await _database
+          .into(_database.reminderEntityLinks)
+          .insert(
+            ReminderEntityLinksCompanion.insert(
+              id: _uuid.v4(),
+              reminderId: reminderId,
+              entityType: entityType,
+              entityId: entityId,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await _enqueueChange('reminder', reminderId, 'create', now);
+    });
+  }
+
+  Stream<List<ReminderModel>> watchRemindersForEntity(
+    String entityType,
+    String entityId,
+  ) {
+    return _database
+        .customSelect(
+          '''SELECT r.id, r.title, r.description, r.due_at, r.priority,
+                r.is_done, r.done_at, r.scheme_id, sc.name AS scheme_name,
+                r.site_id, st.name AS site_name, r.remarks, r.created_at
+         FROM reminders r
+         INNER JOIN reminder_entity_links l ON l.reminder_id = r.id
+         LEFT JOIN schemes sc ON sc.id = r.scheme_id AND sc.deleted_at IS NULL
+         LEFT JOIN sites st ON st.id = r.site_id AND st.deleted_at IS NULL
+         WHERE r.deleted_at IS NULL AND l.deleted_at IS NULL
+           AND l.entity_type = ? AND l.entity_id = ?
+         ORDER BY r.due_at ASC, r.created_at ASC, r.id ASC''',
+          variables: [
+            Variable.withString(entityType),
+            Variable.withString(entityId),
+          ],
+          readsFrom: {
+            _database.reminders,
+            _database.reminderEntityLinks,
+            _database.schemes,
+            _database.sites,
+          },
+        )
+        .watch()
+        .map((rows) => rows.map(_reminderFromRow).toList());
+  }
+
   Future<void> createReminder({
     required String title,
     String? description,
@@ -236,6 +403,25 @@ class RemindersRepository {
             ),
           );
     }
+  }
+
+  Future<void> _ensureEntityExists(String entityType, String entityId) async {
+    const tables = {
+      'scheme': 'schemes',
+      'site': 'sites',
+      'bill': 'bills',
+      'progress': 'progress_updates',
+      'person': 'people',
+    };
+    final table = tables[entityType.trim().toLowerCase()];
+    if (table == null) throw ArgumentError.value(entityType, 'entityType');
+    final row = await _database
+        .customSelect(
+          'SELECT id FROM $table WHERE id = ? AND deleted_at IS NULL',
+          variables: [Variable.withString(entityId)],
+        )
+        .getSingleOrNull();
+    if (row == null) throw ArgumentError.value(entityId, 'entityId');
   }
 
   ReminderModel _reminderFromRow(QueryRow row) {

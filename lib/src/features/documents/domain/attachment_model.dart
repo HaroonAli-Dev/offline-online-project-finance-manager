@@ -10,6 +10,9 @@ class AttachmentModel {
     this.filePath,
     required this.fileName,
     this.mimeType,
+    this.fileSize,
+    this.imageWidth,
+    this.imageHeight,
     required this.category,
     this.description,
     required this.capturedAt,
@@ -31,6 +34,9 @@ class AttachmentModel {
 
   /// MIME type, e.g. 'image/jpeg', 'application/pdf'.
   final String? mimeType;
+  final int? fileSize;
+  final int? imageWidth;
+  final int? imageHeight;
 
   /// 'photo', 'document', 'receipt', 'other'
   final String category;
@@ -44,6 +50,8 @@ class AttachmentModel {
       category == 'photo' || (mimeType?.startsWith('image/') ?? false);
 
   bool get hasGps => latitude != null && longitude != null;
+
+  bool get hasImageDimensions => imageWidth != null && imageHeight != null;
 
   String get categoryDisplay => switch (category) {
     'photo' => 'Photo',

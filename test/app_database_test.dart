@@ -160,4 +160,20 @@ void main() {
       expect(reminders, isEmpty);
     },
   );
+
+  test(
+    'migrates from schema version 13 to 14 adding attachment metadata',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+
+      await database.migration.onUpgrade(database.createMigrator(), 13, 14);
+
+      final columns = await database
+          .customSelect('PRAGMA table_info(attachments)')
+          .get();
+      final names = columns.map((row) => row.read<String>('name')).toSet();
+      expect(names, containsAll(['file_size', 'image_width', 'image_height']));
+    },
+  );
 }

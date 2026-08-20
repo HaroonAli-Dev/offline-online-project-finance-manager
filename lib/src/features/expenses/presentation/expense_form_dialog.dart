@@ -284,15 +284,13 @@ class _ExpenseFormDialogState extends State<ExpenseFormDialog> {
                       icon: const Icon(Icons.attach_file),
                       tooltip: 'Select Receipt File',
                       onPressed: () async {
-                        final result = await FilePicker.platform.pickFiles(
+                        final files = await FilePicker.pickFiles(
                           dialogTitle: 'Select Receipt or Bill File',
                           type: FileType.any,
                         );
-                        if (result != null &&
-                            result.files.single.path != null) {
+                        if (files.length == 1 && files.single.path != null) {
                           setState(() {
-                            _attachmentController.text =
-                                result.files.single.path!;
+                            _attachmentController.text = files.single.path!;
                           });
                         }
                       },

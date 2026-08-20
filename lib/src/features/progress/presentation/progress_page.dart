@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/hint_banner.dart';
+import '../../documents/presentation/entity_attachments_page.dart';
 import '../../schemes/domain/scheme_model.dart';
 import 'progress_form_dialog.dart';
 import 'progress_providers.dart';
@@ -292,10 +293,20 @@ class _ProgressTile extends StatelessWidget {
         onSelected: (action) => switch (action) {
           _Action.edit => onEdit(),
           _Action.delete => onDelete(),
+          _Action.attachments => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => EntityAttachmentsPage(
+                entityType: 'progress_update',
+                entityId: update.id,
+                title: update.schemeName,
+              ),
+            ),
+          ),
         },
         itemBuilder: (_) => const [
           PopupMenuItem(value: _Action.edit, child: Text('Edit')),
           PopupMenuItem(value: _Action.delete, child: Text('Delete')),
+          PopupMenuItem(value: _Action.attachments, child: Text('Attachments')),
         ],
       ),
     );
@@ -323,4 +334,4 @@ class _StatusDot extends StatelessWidget {
   }
 }
 
-enum _Action { edit, delete }
+enum _Action { edit, delete, attachments }

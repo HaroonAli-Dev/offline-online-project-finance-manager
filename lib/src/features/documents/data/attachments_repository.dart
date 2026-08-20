@@ -21,7 +21,7 @@ class AttachmentsRepository {
     String entityId,
   ) {
     const sql = '''
-      SELECT id, entity_type, entity_id, file_path, file_name, mime_type,
+      SELECT id, entity_type, entity_id, file_path, file_name, mime_type, file_size, image_width, image_height,
              category, description, captured_at, latitude, longitude
       FROM attachments
       WHERE deleted_at IS NULL
@@ -48,7 +48,7 @@ class AttachmentsRepository {
     final cleanCategory = categoryFilter?.trim() ?? '';
 
     const sql = '''
-      SELECT id, entity_type, entity_id, file_path, file_name, mime_type,
+      SELECT id, entity_type, entity_id, file_path, file_name, mime_type, file_size, image_width, image_height,
              category, description, captured_at, latitude, longitude
       FROM attachments
       WHERE deleted_at IS NULL
@@ -79,12 +79,18 @@ class AttachmentsRepository {
     String? filePath,
     required String fileName,
     String? mimeType,
+    int? fileSize,
+    int? imageWidth,
+    int? imageHeight,
     String category = 'other',
     String? description,
     required DateTime capturedAt,
     double? latitude,
     double? longitude,
   }) async {
+    if (!hasValidCoordinates(latitude, longitude)) {
+      throw ArgumentError('Latitude must be -90..90 and longitude -180..180.');
+    }
     final id = _uuid.v4();
     final now = DateTime.now().toUtc();
 
@@ -99,6 +105,9 @@ class AttachmentsRepository {
               filePath: Value(_cleanOptional(filePath)),
               fileName: fileName.trim(),
               mimeType: Value(_cleanOptional(mimeType)),
+              fileSize: Value(fileSize),
+              imageWidth: Value(imageWidth),
+              imageHeight: Value(imageHeight),
               category: Value(
                 category.trim().isEmpty ? 'other' : category.trim(),
               ),
@@ -123,6 +132,9 @@ class AttachmentsRepository {
     double? latitude,
     double? longitude,
   }) async {
+    if (!hasValidCoordinates(latitude, longitude)) {
+      throw ArgumentError('Latitude must be -90..90 and longitude -180..180.');
+    }
     final now = DateTime.now().toUtc();
 
     await _db.transaction(() async {
@@ -209,6 +221,9 @@ class AttachmentsRepository {
       filePath: row.readNullable<String>('file_path'),
       fileName: row.read<String>('file_name'),
       mimeType: row.readNullable<String>('mime_type'),
+      fileSize: row.readNullable<int>('file_size'),
+      imageWidth: row.readNullable<int>('image_width'),
+      imageHeight: row.readNullable<int>('image_height'),
       category: row.read<String>('category'),
       description: row.readNullable<String>('description'),
       capturedAt: row.read<DateTime>('captured_at'),
@@ -220,5 +235,14 @@ class AttachmentsRepository {
   String? _cleanOptional(String? value) {
     final trimmed = value?.trim();
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  static bool hasValidCoordinates(double? latitude, double? longitude) {
+    if (latitude == null && longitude == null) return true;
+    if (latitude == null || longitude == null) return false;
+    return latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180;
   }
 }

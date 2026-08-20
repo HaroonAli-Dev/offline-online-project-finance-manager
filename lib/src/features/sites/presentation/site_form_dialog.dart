@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/location_service.dart';
 import '../domain/site_model.dart';
 
 class SiteInput {
@@ -37,6 +38,7 @@ class _SiteFormDialogState extends State<SiteFormDialog> {
   late final TextEditingController _lngController;
   late final TextEditingController _notesController;
   late String _status;
+  bool _gettingLocation = false;
 
   @override
   void initState() {
@@ -145,6 +147,20 @@ class _SiteFormDialogState extends State<SiteFormDialog> {
                     ),
                   ],
                 ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _gettingLocation ? null : _captureLocation,
+                    icon: _gettingLocation
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.my_location),
+                    label: const Text('Use current location'),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _status,
@@ -205,5 +221,20 @@ class _SiteFormDialogState extends State<SiteFormDialog> {
         notes: _notesController.text,
       ),
     );
+  }
+
+  Future<void> _captureLocation() async {
+    setState(() => _gettingLocation = true);
+    final result = await LocationService.currentLocation();
+    if (!mounted) return;
+    setState(() => _gettingLocation = false);
+    if (result.isSuccess) {
+      _latController.text = result.latitude!.toStringAsFixed(6);
+      _lngController.text = result.longitude!.toStringAsFixed(6);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message ?? 'Location is unavailable.')),
+      );
+    }
   }
 }

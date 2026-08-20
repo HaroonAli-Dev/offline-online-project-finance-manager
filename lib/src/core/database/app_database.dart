@@ -14,6 +14,7 @@ import 'tables/vehicle_logs.dart';
 import 'tables/bills.dart';
 import 'tables/progress_updates.dart';
 import 'tables/attachments.dart';
+import 'tables/reminder_entity_links.dart';
 import 'tables/reminders.dart';
 
 part 'app_database.g.dart';
@@ -34,6 +35,7 @@ part 'app_database.g.dart';
     ProgressUpdates,
     Attachments,
     Reminders,
+    ReminderEntityLinks,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -51,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -142,11 +144,41 @@ class AppDatabase extends _$AppDatabase {
         await migrator.createTable(reminders);
         await _createRemindersIndexes();
       }
+      if (from < 14) {
+        await _addAttachmentMetadataColumns(migrator);
+      }
+      if (from < 15) {
+        await migrator.createTable(reminderEntityLinks);
+        await _createReminderEntityLinkIndexes();
+      }
     },
   );
 
   Future<void> validateConnection() async {
     await customSelect('SELECT 1 AS health_check').getSingle();
+  }
+
+  Future<void> _addAttachmentMetadataColumns(Migrator migrator) async {
+    final columns = await customSelect('PRAGMA table_info(attachments)').get();
+    final names = columns.map((row) => row.read<String>('name')).toSet();
+    if (!names.contains('file_size')) {
+      await migrator.addColumn(
+        attachments,
+        attachments.fileSize as GeneratedColumn<Object>,
+      );
+    }
+    if (!names.contains('image_width')) {
+      await migrator.addColumn(
+        attachments,
+        attachments.imageWidth as GeneratedColumn<Object>,
+      );
+    }
+    if (!names.contains('image_height')) {
+      await migrator.addColumn(
+        attachments,
+        attachments.imageHeight as GeneratedColumn<Object>,
+      );
+    }
   }
 
   Future<void> seedDefaultRoles() async {
@@ -438,6 +470,21 @@ class AppDatabase extends _$AppDatabase {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS reminders_deleted_at_index '
       'ON reminders (deleted_at)',
+    );
+  }
+
+  Future<void> _createReminderEntityLinkIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS reminder_entity_links_reminder_id_index '
+      'ON reminder_entity_links (reminder_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS reminder_entity_links_entity_index '
+      'ON reminder_entity_links (entity_type, entity_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS reminder_entity_links_deleted_at_index '
+      'ON reminder_entity_links (deleted_at)',
     );
   }
 }

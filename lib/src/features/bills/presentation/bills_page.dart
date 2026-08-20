@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/async_value_extensions.dart';
+
 import '../../../core/widgets/hint_banner.dart';
+import '../../documents/presentation/entity_attachments_page.dart';
 import '../../schemes/presentation/schemes_providers.dart';
 import '../data/bills_repository.dart';
 import '../domain/bill_model.dart';
@@ -391,12 +394,25 @@ class _BillCard extends StatelessWidget {
                   onSelected: (action) => switch (action) {
                     _BillAction.edit => onEdit(),
                     _BillAction.delete => onDelete(),
+                    _BillAction.attachments => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => EntityAttachmentsPage(
+                          entityType: 'bill',
+                          entityId: bill.id,
+                          title: bill.schemeName,
+                        ),
+                      ),
+                    ),
                   },
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: _BillAction.edit, child: Text('Edit')),
                     PopupMenuItem(
                       value: _BillAction.delete,
                       child: Text('Delete'),
+                    ),
+                    PopupMenuItem(
+                      value: _BillAction.attachments,
+                      child: Text('Attachments'),
                     ),
                   ],
                 ),
@@ -546,4 +562,4 @@ class _EmptyBillsState extends StatelessWidget {
   }
 }
 
-enum _BillAction { edit, delete }
+enum _BillAction { edit, delete, attachments }

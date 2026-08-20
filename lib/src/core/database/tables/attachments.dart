@@ -27,6 +27,13 @@ class Attachments extends Table with SyncableTable {
   /// MIME type, e.g. 'image/jpeg', 'application/pdf'. Nullable if unknown.
   TextColumn get mimeType => text().nullable()();
 
+  /// Byte size of the locally stored file.
+  IntColumn get fileSize => integer().nullable()();
+
+  /// Dimensions for image attachments after local processing.
+  IntColumn get imageWidth => integer().nullable()();
+  IntColumn get imageHeight => integer().nullable()();
+
   /// Broad category: 'photo', 'document', 'receipt', 'other'.
   TextColumn get category => text().withDefault(const Constant('other'))();
 

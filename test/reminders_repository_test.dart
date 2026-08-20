@@ -429,4 +429,105 @@ void main() {
     final reminders = await remindersRepository.watchReminders().first;
     expect(reminders.single.dueAt, isNull);
   });
+
+  // --------------------------------------------------------------------------
+  // 23. getById and restore
+  // --------------------------------------------------------------------------
+  test(
+    'getById returns the reminder and restore reactivates soft-deleted data',
+    () async {
+      await remindersRepository.createReminder(title: 'Temporary reminder');
+      final original =
+          (await remindersRepository.watchReminders().first).single;
+
+      await remindersRepository.deleteReminder(original.id);
+      expect(await remindersRepository.getById(original.id), isNull);
+
+      await remindersRepository.restoreReminder(original.id);
+      final restored = await remindersRepository.getById(original.id);
+      expect(restored, isNotNull);
+      expect(restored!.title, 'Temporary reminder');
+    },
+  );
+
+  // --------------------------------------------------------------------------
+  // 24. Date, upcoming, overdue queries and due time handling
+  // --------------------------------------------------------------------------
+  test(
+    'date, upcoming, overdue queries and time-aware dueAt work as expected',
+    () async {
+      final today = DateTime.now().toUtc();
+      final dueToday = today.add(const Duration(hours: 5));
+      final tomorrow = today.add(const Duration(days: 1));
+      final past = today.subtract(const Duration(days: 2));
+
+      await remindersRepository.createReminder(
+        title: 'Due today',
+        dueAt: dueToday,
+      );
+      await remindersRepository.createReminder(
+        title: 'Due tomorrow',
+        dueAt: tomorrow,
+      );
+      await remindersRepository.createReminder(
+        title: 'Overdue task',
+        dueAt: past,
+      );
+
+      final byDate = await remindersRepository
+          .watchRemindersForDate(today)
+          .first;
+      expect(byDate.any((r) => r.title == 'Due today'), isTrue);
+
+      final upcoming = await remindersRepository.watchUpcomingReminders().first;
+      expect(upcoming.any((r) => r.title == 'Due today'), isTrue);
+      expect(upcoming.any((r) => r.title == 'Overdue task'), isFalse);
+
+      final overdue = await remindersRepository.watchOverdueReminders().first;
+      expect(overdue.any((r) => r.title == 'Overdue task'), isTrue);
+    },
+  );
+
+  // --------------------------------------------------------------------------
+  // 25. Relationship support for normalized entity links
+  // --------------------------------------------------------------------------
+  test('createReminderWithRelationship and query by entity work for scheme, site, bill, progress, and person', () async {
+    await schemesRepository.createScheme(
+      schemeCode: 'SCH-R02',
+      name: 'Scheme R2',
+      budget: 250000.0,
+      status: 'working',
+      progressPercentage: 0,
+    );
+    final scheme = (await schemesRepository.watchSchemes().first).single;
+
+    await sitesRepository.createSite(name: 'Site Alpha');
+    final site = (await sitesRepository.watchSites().first).single;
+
+    await remindersRepository.createReminderWithRelationship(
+      title: 'Scheme reminder',
+      entityType: 'scheme',
+      entityId: scheme.id,
+    );
+    await remindersRepository.createReminderWithRelationship(
+      title: 'Site reminder',
+      entityType: 'site',
+      entityId: site.id,
+    );
+
+    final schemeReminders = await remindersRepository
+        .watchRemindersForEntity('scheme', scheme.id)
+        .first;
+    expect(schemeReminders.single.title, 'Scheme reminder');
+
+    final siteReminders = await remindersRepository
+        .watchRemindersForEntity('site', site.id)
+        .first;
+    expect(siteReminders.single.title, 'Site reminder');
+
+    final invalid = await remindersRepository
+        .watchRemindersForEntity('person', 'missing-id')
+        .first;
+    expect(invalid, isEmpty);
+  });
 }
