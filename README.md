@@ -343,25 +343,48 @@ Use the priority, completion, and search filters to focus on the reminders that 
 
 ---
 
+## Offline-First Synchronization Architecture
+
+The application uses an offline-first architecture with local SQLite (Drift) and cloud Supabase PostgreSQL:
+
+```
+LOCAL MUTATION (Insert/Update/Delete)
+    ↓
+Local Drift Transaction (Immediate UI Update)
+    ↓
+SyncOutbox Entry Enqueued (Atomically)
+    ↓
+SyncEngine (Background Worker with Exponential Backoff)
+    ↓
+Supabase PostgreSQL (Scoped by auth.uid() = user_id)
+```
+
+- **Local Writes**: Mutations write directly to Drift/SQLite, inserting/updating a `SyncOutbox` entry atomically.
+- **Push Pipeline**: Outbox entries are processed in FIFO order. Successful uploads remove the outbox row. Network failures trigger bounded exponential backoff (`attemptCount`, `nextAttemptAt`).
+- **Pull Pipeline**: Queries Supabase incrementally via `updated_at > lastSyncedAt`.
+- **Conflict Resolution (LWW)**: Last-Write-Wins based on timestamps (`remote.updated_at` vs `local.updatedAt`). Ties resolve deterministically in favor of cloud state.
+- **Soft Deletion**: Soft deletes (`deleted_at`) propagate bidirectionally without physical row destruction.
+- **Security & User Isolation**: Synchronization is executed only for the authenticated Supabase user (`user_id = auth.uid()`). Offline bypass mode disables cloud sync to avoid cross-tenant contamination.
+
+---
+
 ## Running the App
 
 ```powershell
 # Install dependencies (first time only):
 flutter pub get
 
-# Run on Windows desktop:
+# Run on Windows desktop (offline mode):
 flutter run -d windows
 
-# If you get a build error, clean and retry:
-flutter clean
-flutter run -d windows
+# Run with Supabase cloud credentials:
+flutter run -d windows --dart-define=SUPABASE_URL=https://xyz.supabase.co --dart-define=SUPABASE_ANON_KEY=ey...
 ```
 
 **Requirements:**
-- Windows 10 or later
+- Windows 10 or later / Web / Android
 - Flutter SDK 3.x (Channel stable)
-- Visual Studio 2022 or later with the **"Desktop development with C++"** workload installed
 
 ---
 
-*Built with Flutter · Offline-first · Data stored locally using SQLite via Drift*
+*Built with Flutter · Offline-first · SQLite via Drift · Supabase Sync & Auth*

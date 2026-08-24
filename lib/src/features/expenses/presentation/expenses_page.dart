@@ -275,13 +275,7 @@ class _ExpensesFilters extends StatelessWidget {
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 8),
-        if (isWide)
-          Wrap(spacing: 8, runSpacing: 8, children: categoryChips)
-        else
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: categoryChips),
-          ),
+        Wrap(spacing: 8, runSpacing: 8, children: categoryChips),
       ],
     );
 

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/sync/sync_engine.dart';
+import '../../../core/sync/sync_providers.dart';
 import '../../../core/utils/async_value_extensions.dart';
 
 import '../../../core/widgets/hint_banner.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../bills/presentation/bills_providers.dart';
 import '../../expenses/presentation/expenses_page.dart';
 import '../../expenses/presentation/expenses_providers.dart';
@@ -53,10 +56,38 @@ class DashboardPage extends ConsumerWidget {
         .where((s) => s.status == 'incomplete')
         .length;
 
+    final syncStatus = ref.watch(syncControllerProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
         actions: [
+          IconButton(
+            icon: syncStatus.state == SyncEngineState.syncing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync_outlined),
+            tooltip: 'Sync Cloud Data',
+            onPressed: syncStatus.state == SyncEngineState.syncing
+                ? null
+                : () async {
+                    final success = await ref
+                        .read(syncControllerProvider.notifier)
+                        .synchronize();
+                    if (!context.mounted) return;
+                    if (success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Sync completed successfully.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+          ),
           IconButton(
             icon: const Icon(Icons.file_download_outlined),
             tooltip: 'Export & Backup',
@@ -64,6 +95,11 @@ class DashboardPage extends ConsumerWidget {
               context: context,
               builder: (_) => const BackupExportDialog(),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout_outlined),
+            tooltip: 'Sign Out',
+            onPressed: () => _confirmSignOut(context, ref),
           ),
           const PageHelpIconButton(pageKey: 'dashboard'),
         ],
@@ -573,4 +609,28 @@ class _StatCard extends StatelessWidget {
       ),
     );
   }
+}
+
+void _confirmSignOut(BuildContext context, WidgetRef ref) {
+  final userEmail = ref.read(currentUserEmailProvider) ?? 'user';
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Sign Out'),
+      content: Text('Are you sure you want to sign out ($userEmail)?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.of(ctx).pop();
+            ref.read(authStateProvider.notifier).signOut();
+          },
+          child: const Text('Sign Out'),
+        ),
+      ],
+    ),
+  );
 }

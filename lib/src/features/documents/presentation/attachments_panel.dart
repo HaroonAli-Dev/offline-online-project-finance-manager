@@ -1,10 +1,15 @@
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/database/app_database.dart';
+import '../../../core/providers/database_provider.dart';
 import '../../../core/services/file_launcher_service.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/sync/sync_providers.dart';
 import '../data/attachment_local_storage.dart';
 import '../data/attachment_picker_service.dart';
+import '../data/attachment_storage_service.dart';
 import '../data/image_compression_service.dart';
 import '../domain/attachment_model.dart';
 import 'attachments_providers.dart';
@@ -194,14 +199,60 @@ class AttachmentsPanel extends ConsumerWidget {
   }
 }
 
-class _AttachmentTile extends StatelessWidget {
+class _AttachmentTile extends ConsumerStatefulWidget {
   const _AttachmentTile({required this.attachment, required this.onDelete});
 
   final AttachmentModel attachment;
   final VoidCallback onDelete;
 
   @override
+  ConsumerState<_AttachmentTile> createState() => _AttachmentTileState();
+}
+
+class _AttachmentTileState extends ConsumerState<_AttachmentTile> {
+  bool _isDownloading = false;
+
+  Future<void> _downloadAndOpen(BuildContext context) async {
+    final storagePath = widget.attachment.storagePath;
+    if (storagePath == null || storagePath.isEmpty) return;
+
+    setState(() => _isDownloading = true);
+    try {
+      final storageClient = ref.read(attachmentStorageClientProvider);
+      if (storageClient == null) {
+        throw StateError('Supabase Storage is not configured or offline.');
+      }
+      final bytes = await storageClient.downloadBytes(
+        bucket: AttachmentStorageService.defaultBucket,
+        storagePath: storagePath,
+      );
+      final localPath = await saveAttachmentLocally(bytes, widget.attachment.fileName);
+
+      if (localPath != null) {
+        final db = ref.read(appDatabaseProvider);
+        await (db.update(db.attachments)..where((t) => t.id.equals(widget.attachment.id))).write(
+          AttachmentsCompanion(
+            filePath: Value(localPath),
+          ),
+        );
+        if (context.mounted) {
+          await FileLauncherService.openFile(localPath);
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to download attachment: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final attachment = widget.attachment;
     final icon = attachment.isPhoto
         ? Icons.image_outlined
         : attachment.category == 'receipt'
@@ -209,6 +260,9 @@ class _AttachmentTile extends StatelessWidget {
         : attachment.category == 'document'
         ? Icons.description_outlined
         : Icons.attach_file;
+
+    final hasLocalFile = attachment.filePath != null && attachment.filePath!.isNotEmpty;
+    final hasCloudFile = attachment.storagePath != null && attachment.storagePath!.isNotEmpty;
 
     return ListTile(
       dense: true,
@@ -230,17 +284,32 @@ class _AttachmentTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (attachment.filePath != null)
+          if (_isDownloading)
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: Padding(
+                padding: EdgeInsets.all(4),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (hasLocalFile)
             IconButton(
               icon: const Icon(Icons.open_in_new, size: 18),
               tooltip: 'Open file',
               onPressed: () =>
                   FileLauncherService.openFile(attachment.filePath!),
+            )
+          else if (hasCloudFile)
+            IconButton(
+              icon: const Icon(Icons.cloud_download_outlined, size: 18),
+              tooltip: 'Download from cloud',
+              onPressed: () => _downloadAndOpen(context),
             ),
           IconButton(
             icon: const Icon(Icons.delete_outline, size: 18),
             tooltip: 'Remove',
-            onPressed: onDelete,
+            onPressed: widget.onDelete,
           ),
         ],
       ),

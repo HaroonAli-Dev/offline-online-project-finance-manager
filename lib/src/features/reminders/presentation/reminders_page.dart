@@ -21,7 +21,6 @@ class RemindersPage extends ConsumerWidget {
     final sites = ref.watch(sitesProvider).valueOrNull ?? const [];
     final selectedPriority = ref.watch(remindersPriorityFilterProvider);
     final selectedDone = ref.watch(remindersDoneFilterProvider);
-    final selectedDate = ref.watch(remindersSelectedDateProvider);
     final repository = ref.read(remindersRepositoryProvider);
 
     return Scaffold(
@@ -49,15 +48,7 @@ class RemindersPage extends ConsumerWidget {
 
           final list = reminders.when(
             data: (items) => _RemindersList(
-              items: selectedDate == null
-                  ? items
-                  : items.where((item) {
-                      final due = item.dueAt?.toLocal();
-                      return due != null &&
-                          due.year == selectedDate.year &&
-                          due.month == selectedDate.month &&
-                          due.day == selectedDate.day;
-                    }).toList(),
+              items: items,
               repository: repository,
               schemes: schemes,
               sites: sites,
@@ -68,29 +59,13 @@ class RemindersPage extends ConsumerWidget {
                 Center(child: Text('Unable to load reminders: $e')),
           );
 
-          final calendar = _ReminderCalendar(
-            selectedDate: selectedDate,
-            reminders: reminders.valueOrNull ?? const [],
-            onDateSelected: (date) =>
-                ref.read(remindersSelectedDateProvider.notifier).state = date,
-            onAllDates: () =>
-                ref.read(remindersSelectedDateProvider.notifier).state = null,
-          );
-
           if (isWide) {
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(width: 280, child: filters),
                 const VerticalDivider(width: 1),
-                Expanded(
-                  child: Column(
-                    children: [
-                      calendar,
-                      Expanded(child: list),
-                    ],
-                  ),
-                ),
+                Expanded(child: list),
               ],
             );
           }
@@ -99,14 +74,7 @@ class RemindersPage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SingleChildScrollView(child: filters),
-              Expanded(
-                child: Column(
-                  children: [
-                    calendar,
-                    Expanded(child: list),
-                  ],
-                ),
-              ),
+              Expanded(child: list),
             ],
           );
         },
@@ -114,59 +82,6 @@ class RemindersPage extends ConsumerWidget {
     );
   }
 }
-
-class _ReminderCalendar extends StatelessWidget {
-  const _ReminderCalendar({
-    required this.selectedDate,
-    required this.reminders,
-    required this.onDateSelected,
-    required this.onAllDates,
-  });
-
-  final DateTime? selectedDate;
-  final List<ReminderModel> reminders;
-  final ValueChanged<DateTime> onDateSelected;
-  final VoidCallback onAllDates;
-
-  @override
-  Widget build(BuildContext context) {
-    final datesWithReminders = reminders
-        .map((reminder) => reminder.dueAt?.toLocal())
-        .whereType<DateTime>()
-        .map((date) => '${date.year}-${date.month}-${date.day}')
-        .toSet()
-        .length;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: CalendarDatePicker(
-              initialDate: selectedDate ?? DateTime.now(),
-              firstDate: DateTime(2020),
-              lastDate: DateTime(2100),
-              onDateChanged: onDateSelected,
-            ),
-          ),
-          Column(
-            children: [
-              Text('$datesWithReminders dates with reminders'),
-              TextButton.icon(
-                onPressed: onAllDates,
-                icon: const Icon(Icons.view_list_outlined),
-                label: const Text('All dates'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Show form helper
-// ---------------------------------------------------------------------------
 
 Future<void> _showReminderForm(
   BuildContext context,
@@ -227,10 +142,6 @@ Future<void> _showReminderForm(
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Filter panel
-// ---------------------------------------------------------------------------
 
 class _RemindersFilters extends StatelessWidget {
   const _RemindersFilters({
@@ -301,23 +212,11 @@ class _RemindersFilters extends StatelessWidget {
         const SizedBox(height: 16),
         Text('Priority', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        if (isWide)
-          Wrap(spacing: 8, runSpacing: 8, children: priorityChips)
-        else
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: priorityChips),
-          ),
+        Wrap(spacing: 8, runSpacing: 8, children: priorityChips),
         const SizedBox(height: 16),
         Text('Status', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        if (isWide)
-          Wrap(spacing: 8, runSpacing: 8, children: doneChips)
-        else
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: doneChips),
-          ),
+        Wrap(spacing: 8, runSpacing: 8, children: doneChips),
       ],
     );
 
@@ -330,10 +229,6 @@ class _RemindersFilters extends StatelessWidget {
     return Padding(padding: const EdgeInsets.all(16), child: content);
   }
 }
-
-// ---------------------------------------------------------------------------
-// Reminders list
-// ---------------------------------------------------------------------------
 
 class _RemindersList extends StatelessWidget {
   const _RemindersList({
@@ -428,10 +323,6 @@ class _RemindersList extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Reminder card
-// ---------------------------------------------------------------------------
-
 class _ReminderCard extends StatelessWidget {
   const _ReminderCard({
     required this.reminder,
@@ -511,8 +402,8 @@ class _ReminderCard extends StatelessWidget {
                 children: [
                   if (reminder.dueAt != null)
                     _InfoChip(
-                      icon: Icons.calendar_today_outlined,
-                      label: _formatDate(reminder.dueAt!),
+                      icon: Icons.schedule_outlined,
+                      label: _formatDateTime(reminder.dueAt!),
                       color: overdue ? Colors.red : null,
                     ),
                   if (reminder.schemeName != null)
@@ -551,11 +442,15 @@ class _ReminderCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime dt) {
+  String _formatDateTime(DateTime dt) {
     final local = dt.toLocal();
-    return '${local.day.toString().padLeft(2, '0')}/'
+    final date =
+        '${local.day.toString().padLeft(2, '0')}/'
         '${local.month.toString().padLeft(2, '0')}/'
         '${local.year}';
+    final hasTime = local.hour != 0 || local.minute != 0;
+    if (!hasTime) return date;
+    return '$date  ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 }
 
@@ -619,10 +514,6 @@ class _PriorityBadge extends StatelessWidget {
 
 enum _ReminderAction { edit, delete }
 
-// ---------------------------------------------------------------------------
-// Reminder form dialog
-// ---------------------------------------------------------------------------
-
 class _ReminderInput {
   const _ReminderInput({
     required this.title,
@@ -664,7 +555,15 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
   late final TextEditingController _descCtrl;
   late final TextEditingController _remarksCtrl;
   late String _priority;
-  DateTime? _dueAt;
+
+  bool _hasDueDate = false;
+  late int _day;
+  late int _month;
+  late int _year;
+  late int _hour;
+  late int _minute;
+  bool _hasTime = false;
+
   String? _schemeId;
   String? _siteId;
 
@@ -676,9 +575,26 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
     _descCtrl = TextEditingController(text: r?.description ?? '');
     _remarksCtrl = TextEditingController(text: r?.remarks ?? '');
     _priority = r?.priority ?? 'medium';
-    _dueAt = r?.dueAt?.toLocal();
     _schemeId = r?.schemeId;
     _siteId = r?.siteId;
+
+    final due = r?.dueAt?.toLocal();
+    if (due != null) {
+      _hasDueDate = true;
+      _day = due.day;
+      _month = due.month;
+      _year = due.year;
+      _hour = due.hour;
+      _minute = due.minute;
+      _hasTime = _hour != 0 || _minute != 0;
+    } else {
+      final now = DateTime.now();
+      _day = now.day;
+      _month = now.month;
+      _year = now.year;
+      _hour = 9;
+      _minute = 0;
+    }
   }
 
   @override
@@ -689,43 +605,19 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
     super.dispose();
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _dueAt ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
+  DateTime? get _dueAt {
+    if (!_hasDueDate) return null;
+    return DateTime(
+      _year,
+      _month,
+      _day,
+      _hasTime ? _hour : 0,
+      _hasTime ? _minute : 0,
     );
-    if (picked != null) {
-      setState(() {
-        _dueAt = DateTime(
-          picked.year,
-          picked.month,
-          picked.day,
-          _dueAt?.hour ?? 0,
-          _dueAt?.minute ?? 0,
-        );
-      });
-    }
   }
 
-  Future<void> _pickTime() async {
-    if (_dueAt == null) return;
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_dueAt!),
-    );
-    if (picked != null) {
-      setState(() {
-        _dueAt = DateTime(
-          _dueAt!.year,
-          _dueAt!.month,
-          _dueAt!.day,
-          picked.hour,
-          picked.minute,
-        );
-      });
-    }
+  int _daysInMonth(int year, int month) {
+    return DateTime(year, month + 1, 0).day;
   }
 
   void _submit() {
@@ -734,16 +626,14 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
       context,
       _ReminderInput(
         title: _titleCtrl.text.trim(),
-        description: _descCtrl.text.trim().isEmpty
-            ? null
-            : _descCtrl.text.trim(),
+        description:
+            _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         dueAt: _dueAt,
         priority: _priority,
         schemeId: _schemeId,
         siteId: _siteId,
-        remarks: _remarksCtrl.text.trim().isEmpty
-            ? null
-            : _remarksCtrl.text.trim(),
+        remarks:
+            _remarksCtrl.text.trim().isEmpty ? null : _remarksCtrl.text.trim(),
       ),
     );
   }
@@ -751,6 +641,8 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.reminder != null;
+    final maxDay = _daysInMonth(_year, _month);
+    // Note: _day is already clamped in the month/year onChanged handlers
 
     return AlertDialog(
       title: Text(isEdit ? 'Edit Reminder' : 'Add Reminder'),
@@ -761,6 +653,7 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 TextFormField(
                   controller: _titleCtrl,
@@ -768,9 +661,8 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
                     labelText: 'Title *',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Title is required'
-                      : null,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Title is required' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -787,6 +679,7 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
                   decoration: const InputDecoration(
                     labelText: 'Priority',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.flag_outlined),
                   ),
                   items: kReminderPriorities
                       .map(
@@ -795,44 +688,178 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
                       .toList(),
                   onChanged: (v) => setState(() => _priority = v ?? 'medium'),
                 ),
-                const SizedBox(height: 12),
-                // Due date picker
-                InkWell(
-                  onTap: _pickDate,
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Due date (optional)',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.calendar_today_outlined),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _hasDueDate,
+                      onChanged: (v) =>
+                          setState(() => _hasDueDate = v ?? false),
                     ),
-                    child: Text(
-                      _dueAt == null
-                          ? 'No due date'
-                          : '${_dueAt!.day.toString().padLeft(2, '0')}/'
-                                '${_dueAt!.month.toString().padLeft(2, '0')}/'
-                                '${_dueAt!.year}',
+                    const SizedBox(width: 4),
+                    Text(
+                      'Set due date',
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
-                  ),
+                  ],
                 ),
-                if (_dueAt != null) ...[
+                if (_hasDueDate) ...[
                   const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _pickTime,
-                    icon: const Icon(Icons.access_time_outlined),
-                    label: Text(
-                      _dueAt!.hour == 0 && _dueAt!.minute == 0
-                          ? 'Add due time'
-                          : 'Due time: ${_dueAt!.hour.toString().padLeft(2, '0')}:${_dueAt!.minute.toString().padLeft(2, '0')}',
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          initialValue: _day,
+                          decoration: const InputDecoration(
+                            labelText: 'Day',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                          ),
+                          items: List.generate(maxDay, (i) => i + 1)
+                              .map(
+                                (d) => DropdownMenuItem(
+                                  value: d,
+                                  child: Text(d.toString().padLeft(2, '0')),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) => setState(() => _day = v ?? _day),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          initialValue: _month,
+                          decoration: const InputDecoration(
+                            labelText: 'Month',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 1, child: Text('Jan')),
+                            DropdownMenuItem(value: 2, child: Text('Feb')),
+                            DropdownMenuItem(value: 3, child: Text('Mar')),
+                            DropdownMenuItem(value: 4, child: Text('Apr')),
+                            DropdownMenuItem(value: 5, child: Text('May')),
+                            DropdownMenuItem(value: 6, child: Text('Jun')),
+                            DropdownMenuItem(value: 7, child: Text('Jul')),
+                            DropdownMenuItem(value: 8, child: Text('Aug')),
+                            DropdownMenuItem(value: 9, child: Text('Sep')),
+                            DropdownMenuItem(value: 10, child: Text('Oct')),
+                            DropdownMenuItem(value: 11, child: Text('Nov')),
+                            DropdownMenuItem(value: 12, child: Text('Dec')),
+                          ],
+                          onChanged: (v) => setState(() {
+                            _month = v ?? _month;
+                            final newMax = _daysInMonth(_year, _month);
+                            if (_day > newMax) _day = newMax;
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          initialValue: _year,
+                          decoration: const InputDecoration(
+                            labelText: 'Year',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                          ),
+                          items: List.generate(12, (i) => DateTime.now().year + i - 1)
+                              .map(
+                                (y) => DropdownMenuItem(
+                                  value: y,
+                                  child: Text(y.toString()),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) => setState(() {
+                            _year = v ?? _year;
+                            final newMax = _daysInMonth(_year, _month);
+                            if (_day > newMax) _day = newMax;
+                          }),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => setState(() => _dueAt = null),
-                      child: const Text('Clear date'),
-                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _hasTime,
+                        onChanged: (v) =>
+                            setState(() => _hasTime = v ?? false),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Set due time',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
                   ),
+                  if (_hasTime) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            initialValue: _hour,
+                            decoration: const InputDecoration(
+                              labelText: 'Hour',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            items: List.generate(24, (i) => i)
+                                .map(
+                                  (h) => DropdownMenuItem(
+                                    value: h,
+                                    child: Text(h.toString().padLeft(2, '0')),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _hour = v ?? _hour),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            initialValue: _minute,
+                            decoration: const InputDecoration(
+                              labelText: 'Minute',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            items: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+                                .map(
+                                  (m) => DropdownMenuItem(
+                                    value: m,
+                                    child: Text(m.toString().padLeft(2, '0')),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _minute = v ?? _minute),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
                 const SizedBox(height: 12),
                 if (widget.schemes.isNotEmpty)

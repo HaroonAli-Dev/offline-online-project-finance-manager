@@ -9431,6 +9431,17 @@ class $AttachmentsTable extends Attachments
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _storagePathMeta = const VerificationMeta(
+    'storagePath',
+  );
+  @override
+  late final GeneratedColumn<String> storagePath = GeneratedColumn<String>(
+    'storage_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _mimeTypeMeta = const VerificationMeta(
     'mimeType',
   );
@@ -9544,6 +9555,7 @@ class $AttachmentsTable extends Attachments
     entityId,
     filePath,
     fileName,
+    storagePath,
     mimeType,
     fileSize,
     imageWidth,
@@ -9646,6 +9658,15 @@ class $AttachmentsTable extends Attachments
       );
     } else if (isInserting) {
       context.missing(_fileNameMeta);
+    }
+    if (data.containsKey('storage_path')) {
+      context.handle(
+        _storagePathMeta,
+        storagePath.isAcceptableOrUnknown(
+          data['storage_path']!,
+          _storagePathMeta,
+        ),
+      );
     }
     if (data.containsKey('mime_type')) {
       context.handle(
@@ -9762,6 +9783,10 @@ class $AttachmentsTable extends Attachments
         DriftSqlType.string,
         data['${effectivePrefix}file_name'],
       )!,
+      storagePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}storage_path'],
+      ),
       mimeType: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}mime_type'],
@@ -9830,6 +9855,10 @@ class Attachment extends DataClass implements Insertable<Attachment> {
   /// Original filename including extension, e.g. "site_photo_01.jpg".
   final String fileName;
 
+  /// Cloud Supabase Storage path, e.g. "{user_id}/{entity_type}/{id}/{filename}".
+  /// Nullable for local-only/pending upload attachments.
+  final String? storagePath;
+
   /// MIME type, e.g. 'image/jpeg', 'application/pdf'. Nullable if unknown.
   final String? mimeType;
 
@@ -9866,6 +9895,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     required this.entityId,
     this.filePath,
     required this.fileName,
+    this.storagePath,
     this.mimeType,
     this.fileSize,
     this.imageWidth,
@@ -9898,6 +9928,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       map['file_path'] = Variable<String>(filePath);
     }
     map['file_name'] = Variable<String>(fileName);
+    if (!nullToAbsent || storagePath != null) {
+      map['storage_path'] = Variable<String>(storagePath);
+    }
     if (!nullToAbsent || mimeType != null) {
       map['mime_type'] = Variable<String>(mimeType);
     }
@@ -9945,6 +9978,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
           ? const Value.absent()
           : Value(filePath),
       fileName: Value(fileName),
+      storagePath: storagePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(storagePath),
       mimeType: mimeType == null && nullToAbsent
           ? const Value.absent()
           : Value(mimeType),
@@ -9988,6 +10024,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       entityId: serializer.fromJson<String>(json['entityId']),
       filePath: serializer.fromJson<String?>(json['filePath']),
       fileName: serializer.fromJson<String>(json['fileName']),
+      storagePath: serializer.fromJson<String?>(json['storagePath']),
       mimeType: serializer.fromJson<String?>(json['mimeType']),
       fileSize: serializer.fromJson<int?>(json['fileSize']),
       imageWidth: serializer.fromJson<int?>(json['imageWidth']),
@@ -10014,6 +10051,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       'entityId': serializer.toJson<String>(entityId),
       'filePath': serializer.toJson<String?>(filePath),
       'fileName': serializer.toJson<String>(fileName),
+      'storagePath': serializer.toJson<String?>(storagePath),
       'mimeType': serializer.toJson<String?>(mimeType),
       'fileSize': serializer.toJson<int?>(fileSize),
       'imageWidth': serializer.toJson<int?>(imageWidth),
@@ -10038,6 +10076,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     String? entityId,
     Value<String?> filePath = const Value.absent(),
     String? fileName,
+    Value<String?> storagePath = const Value.absent(),
     Value<String?> mimeType = const Value.absent(),
     Value<int?> fileSize = const Value.absent(),
     Value<int?> imageWidth = const Value.absent(),
@@ -10061,6 +10100,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     entityId: entityId ?? this.entityId,
     filePath: filePath.present ? filePath.value : this.filePath,
     fileName: fileName ?? this.fileName,
+    storagePath: storagePath.present ? storagePath.value : this.storagePath,
     mimeType: mimeType.present ? mimeType.value : this.mimeType,
     fileSize: fileSize.present ? fileSize.value : this.fileSize,
     imageWidth: imageWidth.present ? imageWidth.value : this.imageWidth,
@@ -10092,6 +10132,9 @@ class Attachment extends DataClass implements Insertable<Attachment> {
       entityId: data.entityId.present ? data.entityId.value : this.entityId,
       filePath: data.filePath.present ? data.filePath.value : this.filePath,
       fileName: data.fileName.present ? data.fileName.value : this.fileName,
+      storagePath: data.storagePath.present
+          ? data.storagePath.value
+          : this.storagePath,
       mimeType: data.mimeType.present ? data.mimeType.value : this.mimeType,
       fileSize: data.fileSize.present ? data.fileSize.value : this.fileSize,
       imageWidth: data.imageWidth.present
@@ -10126,6 +10169,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
           ..write('entityId: $entityId, ')
           ..write('filePath: $filePath, ')
           ..write('fileName: $fileName, ')
+          ..write('storagePath: $storagePath, ')
           ..write('mimeType: $mimeType, ')
           ..write('fileSize: $fileSize, ')
           ..write('imageWidth: $imageWidth, ')
@@ -10140,7 +10184,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     createdAt,
     updatedAt,
@@ -10152,6 +10196,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     entityId,
     filePath,
     fileName,
+    storagePath,
     mimeType,
     fileSize,
     imageWidth,
@@ -10161,7 +10206,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
     capturedAt,
     latitude,
     longitude,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -10177,6 +10222,7 @@ class Attachment extends DataClass implements Insertable<Attachment> {
           other.entityId == this.entityId &&
           other.filePath == this.filePath &&
           other.fileName == this.fileName &&
+          other.storagePath == this.storagePath &&
           other.mimeType == this.mimeType &&
           other.fileSize == this.fileSize &&
           other.imageWidth == this.imageWidth &&
@@ -10200,6 +10246,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
   final Value<String> entityId;
   final Value<String?> filePath;
   final Value<String> fileName;
+  final Value<String?> storagePath;
   final Value<String?> mimeType;
   final Value<int?> fileSize;
   final Value<int?> imageWidth;
@@ -10222,6 +10269,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     this.entityId = const Value.absent(),
     this.filePath = const Value.absent(),
     this.fileName = const Value.absent(),
+    this.storagePath = const Value.absent(),
     this.mimeType = const Value.absent(),
     this.fileSize = const Value.absent(),
     this.imageWidth = const Value.absent(),
@@ -10245,6 +10293,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     required String entityId,
     this.filePath = const Value.absent(),
     required String fileName,
+    this.storagePath = const Value.absent(),
     this.mimeType = const Value.absent(),
     this.fileSize = const Value.absent(),
     this.imageWidth = const Value.absent(),
@@ -10274,6 +10323,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     Expression<String>? entityId,
     Expression<String>? filePath,
     Expression<String>? fileName,
+    Expression<String>? storagePath,
     Expression<String>? mimeType,
     Expression<int>? fileSize,
     Expression<int>? imageWidth,
@@ -10297,6 +10347,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
       if (entityId != null) 'entity_id': entityId,
       if (filePath != null) 'file_path': filePath,
       if (fileName != null) 'file_name': fileName,
+      if (storagePath != null) 'storage_path': storagePath,
       if (mimeType != null) 'mime_type': mimeType,
       if (fileSize != null) 'file_size': fileSize,
       if (imageWidth != null) 'image_width': imageWidth,
@@ -10322,6 +10373,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     Value<String>? entityId,
     Value<String?>? filePath,
     Value<String>? fileName,
+    Value<String?>? storagePath,
     Value<String?>? mimeType,
     Value<int?>? fileSize,
     Value<int?>? imageWidth,
@@ -10345,6 +10397,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
       entityId: entityId ?? this.entityId,
       filePath: filePath ?? this.filePath,
       fileName: fileName ?? this.fileName,
+      storagePath: storagePath ?? this.storagePath,
       mimeType: mimeType ?? this.mimeType,
       fileSize: fileSize ?? this.fileSize,
       imageWidth: imageWidth ?? this.imageWidth,
@@ -10394,6 +10447,9 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
     if (fileName.present) {
       map['file_name'] = Variable<String>(fileName.value);
     }
+    if (storagePath.present) {
+      map['storage_path'] = Variable<String>(storagePath.value);
+    }
     if (mimeType.present) {
       map['mime_type'] = Variable<String>(mimeType.value);
     }
@@ -10441,6 +10497,7 @@ class AttachmentsCompanion extends UpdateCompanion<Attachment> {
           ..write('entityId: $entityId, ')
           ..write('filePath: $filePath, ')
           ..write('fileName: $fileName, ')
+          ..write('storagePath: $storagePath, ')
           ..write('mimeType: $mimeType, ')
           ..write('fileSize: $fileSize, ')
           ..write('imageWidth: $imageWidth, ')
@@ -20043,6 +20100,7 @@ typedef $$AttachmentsTableCreateCompanionBuilder =
       required String entityId,
       Value<String?> filePath,
       required String fileName,
+      Value<String?> storagePath,
       Value<String?> mimeType,
       Value<int?> fileSize,
       Value<int?> imageWidth,
@@ -20067,6 +20125,7 @@ typedef $$AttachmentsTableUpdateCompanionBuilder =
       Value<String> entityId,
       Value<String?> filePath,
       Value<String> fileName,
+      Value<String?> storagePath,
       Value<String?> mimeType,
       Value<int?> fileSize,
       Value<int?> imageWidth,
@@ -20140,6 +20199,11 @@ class $$AttachmentsTableFilterComposer
 
   ColumnFilters<String> get fileName => $composableBuilder(
     column: $table.fileName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get storagePath => $composableBuilder(
+    column: $table.storagePath,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -20253,6 +20317,11 @@ class $$AttachmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get storagePath => $composableBuilder(
+    column: $table.storagePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get mimeType => $composableBuilder(
     column: $table.mimeType,
     builder: (column) => ColumnOrderings(column),
@@ -20349,6 +20418,11 @@ class $$AttachmentsTableAnnotationComposer
   GeneratedColumn<String> get fileName =>
       $composableBuilder(column: $table.fileName, builder: (column) => column);
 
+  GeneratedColumn<String> get storagePath => $composableBuilder(
+    column: $table.storagePath,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get mimeType =>
       $composableBuilder(column: $table.mimeType, builder: (column) => column);
 
@@ -20427,6 +20501,7 @@ class $$AttachmentsTableTableManager
                 Value<String> entityId = const Value.absent(),
                 Value<String?> filePath = const Value.absent(),
                 Value<String> fileName = const Value.absent(),
+                Value<String?> storagePath = const Value.absent(),
                 Value<String?> mimeType = const Value.absent(),
                 Value<int?> fileSize = const Value.absent(),
                 Value<int?> imageWidth = const Value.absent(),
@@ -20449,6 +20524,7 @@ class $$AttachmentsTableTableManager
                 entityId: entityId,
                 filePath: filePath,
                 fileName: fileName,
+                storagePath: storagePath,
                 mimeType: mimeType,
                 fileSize: fileSize,
                 imageWidth: imageWidth,
@@ -20473,6 +20549,7 @@ class $$AttachmentsTableTableManager
                 required String entityId,
                 Value<String?> filePath = const Value.absent(),
                 required String fileName,
+                Value<String?> storagePath = const Value.absent(),
                 Value<String?> mimeType = const Value.absent(),
                 Value<int?> fileSize = const Value.absent(),
                 Value<int?> imageWidth = const Value.absent(),
@@ -20495,6 +20572,7 @@ class $$AttachmentsTableTableManager
                 entityId: entityId,
                 filePath: filePath,
                 fileName: fileName,
+                storagePath: storagePath,
                 mimeType: mimeType,
                 fileSize: fileSize,
                 imageWidth: imageWidth,

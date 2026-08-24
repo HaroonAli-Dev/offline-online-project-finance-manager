@@ -242,23 +242,19 @@ class _BillsFilters extends StatelessWidget {
         const SizedBox(height: 16),
         Text('Bill type', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        if (isWide)
-          Wrap(spacing: 8, runSpacing: 8, children: typeChips)
-        else
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: typeChips),
-          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: typeChips,
+        ),
         const SizedBox(height: 16),
         Text('Status', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        if (isWide)
-          Wrap(spacing: 8, runSpacing: 8, children: statusChips)
-        else
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: statusChips),
-          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: statusChips,
+        ),
       ],
     );
 

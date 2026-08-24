@@ -148,64 +148,102 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           );
         }
 
+        // Responsive bottom navigation with two rows for narrow screens
+        const row1Destinations = [
+          (0, Icons.dashboard_outlined, Icons.dashboard, 'Dashboard'),
+          (1, Icons.people_outline, Icons.people, 'People'),
+          (2, Icons.location_city_outlined, Icons.location_city, 'Sites'),
+          (3, Icons.assignment_outlined, Icons.assignment, 'Schemes'),
+          (4, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Transactions'),
+        ];
+        const row2Destinations = [
+          (5, Icons.receipt_long_outlined, Icons.receipt_long, 'Expenses'),
+          (6, Icons.directions_bus_outlined, Icons.directions_bus, 'Vehicles'),
+          (7, Icons.receipt_outlined, Icons.receipt, 'Bills'),
+          (8, Icons.track_changes_outlined, Icons.track_changes, 'Progress'),
+          (9, Icons.notifications_outlined, Icons.notifications, 'Reminders'),
+        ];
+
+        Widget buildNavigationRow(List<(int, IconData, IconData, String)> items) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: items.map((item) {
+              final index = item.$1;
+              final icon = item.$2;
+              final selectedIcon = item.$3;
+              final label = item.$4;
+              final isSelected = _currentIndex == index;
+              final colorScheme = Theme.of(context).colorScheme;
+
+              return Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _currentIndex = index),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Material 3-style pill indicator around the icon
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? colorScheme.primaryContainer
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            isSelected ? selectedIcon : icon,
+                            size: 22,
+                            color: isSelected
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          );
+        }
+
         return Scaffold(
           body: _pages[_currentIndex],
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: (index) =>
-                setState(() => _currentIndex = index),
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: 'Dashboard',
+          bottomNavigationBar: SafeArea(
+            child: Material(
+              elevation: 8,
+              color: Theme.of(context).colorScheme.surfaceContainer,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  buildNavigationRow(row1Destinations),
+                  const Divider(height: 1, thickness: 0.5),
+                  buildNavigationRow(row2Destinations),
+                ],
               ),
-              NavigationDestination(
-                icon: Icon(Icons.people_outline),
-                selectedIcon: Icon(Icons.people),
-                label: 'People',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.location_city_outlined),
-                selectedIcon: Icon(Icons.location_city),
-                label: 'Sites',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.assignment_outlined),
-                selectedIcon: Icon(Icons.assignment),
-                label: 'Schemes',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.account_balance_wallet_outlined),
-                selectedIcon: Icon(Icons.account_balance_wallet),
-                label: 'Transactions',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.receipt_long_outlined),
-                selectedIcon: Icon(Icons.receipt_long),
-                label: 'Expenses',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.directions_bus_outlined),
-                selectedIcon: Icon(Icons.directions_bus),
-                label: 'Vehicles',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.receipt_outlined),
-                selectedIcon: Icon(Icons.receipt),
-                label: 'Bills',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.track_changes_outlined),
-                selectedIcon: Icon(Icons.track_changes),
-                label: 'Progress',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.notifications_outlined),
-                selectedIcon: Icon(Icons.notifications),
-                label: 'Reminders',
-              ),
-            ],
+            ),
           ),
         );
       },

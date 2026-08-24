@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -152,11 +152,25 @@ class AppDatabase extends _$AppDatabase {
         await migrator.createTable(reminderEntityLinks);
         await _createReminderEntityLinkIndexes();
       }
+      if (from < 16) {
+        await _addAttachmentStoragePathColumn(migrator);
+      }
     },
   );
 
   Future<void> validateConnection() async {
     await customSelect('SELECT 1 AS health_check').getSingle();
+  }
+
+  Future<void> _addAttachmentStoragePathColumn(Migrator migrator) async {
+    final columns = await customSelect('PRAGMA table_info(attachments)').get();
+    final names = columns.map((row) => row.read<String>('name')).toSet();
+    if (!names.contains('storage_path')) {
+      await migrator.addColumn(
+        attachments,
+        attachments.storagePath as GeneratedColumn<Object>,
+      );
+    }
   }
 
   Future<void> _addAttachmentMetadataColumns(Migrator migrator) async {

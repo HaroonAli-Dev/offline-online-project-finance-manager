@@ -9,6 +9,7 @@ class AttachmentModel {
     required this.entityId,
     this.filePath,
     required this.fileName,
+    this.storagePath,
     this.mimeType,
     this.fileSize,
     this.imageWidth,
@@ -31,6 +32,9 @@ class AttachmentModel {
 
   /// Original filename including extension.
   final String fileName;
+
+  /// Supabase Storage remote path (e.g. "{user_id}/{entity_type}/{id}/{file_name}")
+  final String? storagePath;
 
   /// MIME type, e.g. 'image/jpeg', 'application/pdf'.
   final String? mimeType;

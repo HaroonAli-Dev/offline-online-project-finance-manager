@@ -24,6 +24,10 @@ class Attachments extends Table with SyncableTable {
   /// Original filename including extension, e.g. "site_photo_01.jpg".
   TextColumn get fileName => text()();
 
+  /// Cloud Supabase Storage path, e.g. "{user_id}/{entity_type}/{id}/{filename}".
+  /// Nullable for local-only/pending upload attachments.
+  TextColumn get storagePath => text().nullable()();
+
   /// MIME type, e.g. 'image/jpeg', 'application/pdf'. Nullable if unknown.
   TextColumn get mimeType => text().nullable()();
 

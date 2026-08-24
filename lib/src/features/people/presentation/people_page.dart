@@ -97,8 +97,12 @@ class PeoplePage extends ConsumerWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              hint,
-              filters,
+              SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [hint, filters],
+                ),
+              ),
               Expanded(child: list),
             ],
           );
@@ -215,13 +219,11 @@ class _PeopleFilters extends StatelessWidget {
           const SizedBox(height: 16),
           Text('Filter by role', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
-          if (isWide)
-            Wrap(spacing: 8, runSpacing: 8, children: roleFilters)
-          else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(children: roleFilters),
-            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: roleFilters,
+          ),
           const SizedBox(height: 8),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,

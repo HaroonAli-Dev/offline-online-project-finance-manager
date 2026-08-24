@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../schemes/domain/scheme_model.dart';
+import '../../documents/presentation/attachments_panel.dart';
 import '../domain/bill_model.dart';
 
 /// Data returned from the bill form on a successful submission.
@@ -263,6 +264,12 @@ class _BillFormDialogState extends State<BillFormDialog> {
                 ),
                 maxLines: 3,
               ),
+              if (isEdit) ...[
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 8),
+                AttachmentsPanel(entityType: 'bill', entityId: widget.bill!.id),
+              ],
             ],
           ),
         ),

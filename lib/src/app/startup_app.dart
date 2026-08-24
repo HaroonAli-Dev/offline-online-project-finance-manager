@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/database/app_database.dart';
 import '../core/providers/database_provider.dart';
+import '../features/auth/presentation/login_screen.dart';
+import '../features/auth/providers/auth_provider.dart';
 import 'app.dart';
 
 class StartupApp extends StatelessWidget {
@@ -50,11 +52,21 @@ class _StartupGate extends StatelessWidget {
               : ProviderScope(
                   key: const ValueKey('application'),
                   overrides: [appDatabaseProvider.overrideWithValue(database)],
-                  child: readyChild ?? const MainNavigationShell(),
+                  child: readyChild ?? const _AuthGate(),
                 ),
         );
       },
     );
+  }
+}
+
+class _AuthGate extends ConsumerWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isAuthenticated = ref.watch(isAuthenticatedProvider);
+    return isAuthenticated ? const MainNavigationShell() : const LoginScreen();
   }
 }
 

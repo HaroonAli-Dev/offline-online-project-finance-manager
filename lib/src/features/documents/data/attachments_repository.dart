@@ -21,7 +21,7 @@ class AttachmentsRepository {
     String entityId,
   ) {
     const sql = '''
-      SELECT id, entity_type, entity_id, file_path, file_name, mime_type, file_size, image_width, image_height,
+      SELECT id, entity_type, entity_id, file_path, file_name, storage_path, mime_type, file_size, image_width, image_height,
              category, description, captured_at, latitude, longitude
       FROM attachments
       WHERE deleted_at IS NULL
@@ -48,7 +48,7 @@ class AttachmentsRepository {
     final cleanCategory = categoryFilter?.trim() ?? '';
 
     const sql = '''
-      SELECT id, entity_type, entity_id, file_path, file_name, mime_type, file_size, image_width, image_height,
+      SELECT id, entity_type, entity_id, file_path, file_name, storage_path, mime_type, file_size, image_width, image_height,
              category, description, captured_at, latitude, longitude
       FROM attachments
       WHERE deleted_at IS NULL
@@ -78,6 +78,7 @@ class AttachmentsRepository {
     required String entityId,
     String? filePath,
     required String fileName,
+    String? storagePath,
     String? mimeType,
     int? fileSize,
     int? imageWidth,
@@ -104,6 +105,7 @@ class AttachmentsRepository {
               entityId: entityId,
               filePath: Value(_cleanOptional(filePath)),
               fileName: fileName.trim(),
+              storagePath: Value(_cleanOptional(storagePath)),
               mimeType: Value(_cleanOptional(mimeType)),
               fileSize: Value(fileSize),
               imageWidth: Value(imageWidth),
@@ -220,6 +222,7 @@ class AttachmentsRepository {
       entityId: row.read<String>('entity_id'),
       filePath: row.readNullable<String>('file_path'),
       fileName: row.read<String>('file_name'),
+      storagePath: row.readNullable<String>('storage_path'),
       mimeType: row.readNullable<String>('mime_type'),
       fileSize: row.readNullable<int>('file_size'),
       imageWidth: row.readNullable<int>('image_width'),

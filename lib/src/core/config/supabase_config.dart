@@ -16,7 +16,7 @@ class SupabaseConfig {
 
   /// Anonymous/publishable API key for the Supabase project.
   static const String supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
+    'SUPABASE_PUBLISHABLE_KEY',
     defaultValue: '',
   );
 
@@ -42,7 +42,7 @@ class SupabaseConfig {
 
     if (effectiveUrl.trim().isEmpty || effectiveAnonKey.trim().isEmpty) {
       debugPrint(
-        'SupabaseConfig: SUPABASE_URL or SUPABASE_ANON_KEY is missing. '
+        'SupabaseConfig: SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY is missing. '
         'Continuing in offline-only mode.',
       );
       _isInitialized = false;
@@ -52,7 +52,7 @@ class SupabaseConfig {
     try {
       await Supabase.initialize(
         url: effectiveUrl.trim(),
-        anonKey: effectiveAnonKey.trim(),
+        publishableKey: effectiveAnonKey.trim(),
       );
       _isInitialized = true;
       debugPrint('SupabaseConfig: Supabase initialized successfully.');
@@ -68,7 +68,7 @@ class SupabaseConfig {
     if (!_isInitialized) {
       throw StateError(
         'Supabase has not been initialized. '
-        'Ensure SUPABASE_URL and SUPABASE_ANON_KEY are provided via --dart-define '
+        'Ensure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are provided via --dart-define '
         'and initialize() has completed.',
       );
     }

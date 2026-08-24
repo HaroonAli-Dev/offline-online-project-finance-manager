@@ -332,13 +332,11 @@ class _TransactionsFilters extends StatelessWidget {
         const SizedBox(height: 16),
         Text('Filter by type', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        if (isWide)
-          Wrap(spacing: 8, runSpacing: 8, children: typeChips)
-        else
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: typeChips),
-          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: typeChips,
+        ),
       ],
     );
 
