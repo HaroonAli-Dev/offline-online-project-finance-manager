@@ -211,33 +211,25 @@ class DashboardPage extends ConsumerWidget {
             // ----------------------------------------------------------------
             const _SectionTitle('Operational Summary'),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatCard(
-                    title: 'Active Sites',
-                    count: '$activeSitesCount / ${sites.length}',
-                    icon: Icons.location_city,
-                    color: Colors.teal,
-                  ),
+            _ResponsiveCardGrid(
+              cards: [
+                _StatCard(
+                  title: 'Active Sites',
+                  count: '$activeSitesCount / ${sites.length}',
+                  icon: Icons.location_city,
+                  color: Colors.teal,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatCard(
-                    title: 'Active Schemes',
-                    count: '$activeSchemesCount / ${schemes.length}',
-                    icon: Icons.assignment,
-                    color: Colors.indigo,
-                  ),
+                _StatCard(
+                  title: 'Active Schemes',
+                  count: '$activeSchemesCount / ${schemes.length}',
+                  icon: Icons.assignment,
+                  color: Colors.indigo,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatCard(
-                    title: 'Workforce',
-                    count: '${people.length} People',
-                    icon: Icons.people,
-                    color: Colors.deepOrange,
-                  ),
+                _StatCard(
+                  title: 'Workforce',
+                  count: '${people.length} People',
+                  icon: Icons.people,
+                  color: Colors.deepOrange,
                 ),
               ],
             ),
@@ -366,8 +358,8 @@ class _ReminderTile extends StatelessWidget {
             ? null
             : Text(
                 overdue
-                    ? 'Overdue — ${_formatDate(reminder.dueAt!)}'
-                    : 'Due ${_formatDate(reminder.dueAt!)}',
+                    ? 'Overdue — ${_formatDateTime(reminder.dueAt!)}'
+                    : 'Due ${_formatDateTime(reminder.dueAt!)}',
                 style: TextStyle(
                   color: overdue ? Colors.red : Colors.grey,
                   fontSize: 12,
@@ -383,6 +375,14 @@ class _ReminderTile extends StatelessWidget {
     return '${local.day.toString().padLeft(2, '0')}/'
         '${local.month.toString().padLeft(2, '0')}/'
         '${local.year}';
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final local = dt.toLocal();
+    final date = _formatDate(dt);
+    if (local.hour == 0 && local.minute == 0) return date;
+    return '$date ${local.hour.toString().padLeft(2, '0')}:'
+        '${local.minute.toString().padLeft(2, '0')}';
   }
 }
 
@@ -440,7 +440,7 @@ class _ResponsiveCardGrid extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 8,
           mainAxisSpacing: 8,
-          childAspectRatio: 1.8,
+          childAspectRatio: 1.4,
           children: cards,
         );
       },
@@ -551,17 +551,23 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 6),
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 3),
             Text(
               count,
               style: Theme.of(context).textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.bold),
             ),
-            Text(title, style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.bodySmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),

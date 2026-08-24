@@ -280,7 +280,11 @@ class _SchemeFormDialogState extends State<SchemeFormDialog> {
                     if (val != null) {
                       setState(() {
                         _status = val;
-                        if (val == 'completed') _progress = 100.0;
+                        if (val == 'completed') {
+                          _progress = 100.0;
+                        } else if (val == 'initial' || val == 'incomplete') {
+                          _progress = 0.0;
+                        }
                       });
                     }
                   },

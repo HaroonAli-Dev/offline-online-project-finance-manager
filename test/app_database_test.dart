@@ -176,4 +176,24 @@ void main() {
       expect(names, containsAll(['file_size', 'image_width', 'image_height']));
     },
   );
+
+  test('creates reminder relationship indexes on a fresh database', () async {
+    final database = AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+
+    final indexes = await database
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'reminder_entity_links_%'",
+        )
+        .get();
+
+    expect(
+      indexes.map((row) => row.read<String>('name')),
+      containsAll([
+        'reminder_entity_links_reminder_id_index',
+        'reminder_entity_links_entity_index',
+        'reminder_entity_links_deleted_at_index',
+      ]),
+    );
+  });
 }

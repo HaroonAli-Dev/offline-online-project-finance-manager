@@ -18,18 +18,19 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Offline-first finance and construction management.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="offline_finance_management_app">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <meta name="apple-mobile-web-app-title" content="Finance Manager">
+  <meta name="theme-color" content="#1B5E20">
+  <link rel="apple-touch-icon" href="icons/AppIcon-192.png">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="icon" type="image/png" href="icons/AppIcon-192.png"/>
 
-  <title>offline_finance_management_app</title>
+  <title>Finance &amp; Construction Manager</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
@@ -41,6 +42,26 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Flutter no longer generates a service worker. Register the app-owned
+    // worker first so the initial Flutter assets and the web database runtime
+    // are cached for offline starts after the first successful visit.
+    (async function () {
+      if ('serviceWorker' in navigator) {
+        try {
+          await navigator.serviceWorker.register('offline_service_worker.js');
+          await navigator.serviceWorker.ready;
+        } catch (error) {
+          // Continue online if the browser or server cannot use service workers.
+          console.warn('Offline cache could not be initialized.', error);
+        }
+      }
+
+      const script = document.createElement('script');
+      script.src = 'flutter_bootstrap.js';
+      script.async = true;
+      document.body.appendChild(script);
+    })();
+  </script>
 </body>
 </html>

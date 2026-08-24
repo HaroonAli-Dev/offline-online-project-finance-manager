@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "D:/CSE_Semesters_Data/offline_finance_management_app/windows"
+    "cmake.sourceDirectory": "D:/CSE_Semesters_Data/offline_finance_management_app/windows",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

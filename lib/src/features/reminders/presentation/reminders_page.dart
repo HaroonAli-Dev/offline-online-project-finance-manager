@@ -21,6 +21,7 @@ class RemindersPage extends ConsumerWidget {
     final sites = ref.watch(sitesProvider).valueOrNull ?? const [];
     final selectedPriority = ref.watch(remindersPriorityFilterProvider);
     final selectedDone = ref.watch(remindersDoneFilterProvider);
+    final selectedDate = ref.watch(remindersSelectedDateProvider);
     final repository = ref.read(remindersRepositoryProvider);
 
     return Scaffold(
@@ -48,7 +49,15 @@ class RemindersPage extends ConsumerWidget {
 
           final list = reminders.when(
             data: (items) => _RemindersList(
-              items: items,
+              items: selectedDate == null
+                  ? items
+                  : items.where((item) {
+                      final due = item.dueAt?.toLocal();
+                      return due != null &&
+                          due.year == selectedDate.year &&
+                          due.month == selectedDate.month &&
+                          due.day == selectedDate.day;
+                    }).toList(),
               repository: repository,
               schemes: schemes,
               sites: sites,
@@ -59,13 +68,29 @@ class RemindersPage extends ConsumerWidget {
                 Center(child: Text('Unable to load reminders: $e')),
           );
 
+          final calendar = _ReminderCalendar(
+            selectedDate: selectedDate,
+            reminders: reminders.valueOrNull ?? const [],
+            onDateSelected: (date) =>
+                ref.read(remindersSelectedDateProvider.notifier).state = date,
+            onAllDates: () =>
+                ref.read(remindersSelectedDateProvider.notifier).state = null,
+          );
+
           if (isWide) {
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(width: 280, child: filters),
                 const VerticalDivider(width: 1),
-                Expanded(child: list),
+                Expanded(
+                  child: Column(
+                    children: [
+                      calendar,
+                      Expanded(child: list),
+                    ],
+                  ),
+                ),
               ],
             );
           }
@@ -74,10 +99,66 @@ class RemindersPage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SingleChildScrollView(child: filters),
-              Expanded(child: list),
+              Expanded(
+                child: Column(
+                  children: [
+                    calendar,
+                    Expanded(child: list),
+                  ],
+                ),
+              ),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _ReminderCalendar extends StatelessWidget {
+  const _ReminderCalendar({
+    required this.selectedDate,
+    required this.reminders,
+    required this.onDateSelected,
+    required this.onAllDates,
+  });
+
+  final DateTime? selectedDate;
+  final List<ReminderModel> reminders;
+  final ValueChanged<DateTime> onDateSelected;
+  final VoidCallback onAllDates;
+
+  @override
+  Widget build(BuildContext context) {
+    final datesWithReminders = reminders
+        .map((reminder) => reminder.dueAt?.toLocal())
+        .whereType<DateTime>()
+        .map((date) => '${date.year}-${date.month}-${date.day}')
+        .toSet()
+        .length;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: CalendarDatePicker(
+              initialDate: selectedDate ?? DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2100),
+              onDateChanged: onDateSelected,
+            ),
+          ),
+          Column(
+            children: [
+              Text('$datesWithReminders dates with reminders'),
+              TextButton.icon(
+                onPressed: onAllDates,
+                icon: const Icon(Icons.view_list_outlined),
+                label: const Text('All dates'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -444,6 +525,11 @@ class _ReminderCard extends StatelessWidget {
                       icon: Icons.location_on_outlined,
                       label: reminder.siteName!,
                     ),
+                  if (reminder.relatedEntityName != null)
+                    _InfoChip(
+                      icon: Icons.link_outlined,
+                      label: reminder.relatedEntityName!,
+                    ),
                 ],
               ),
             ),
@@ -610,7 +696,36 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
-    if (picked != null) setState(() => _dueAt = picked);
+    if (picked != null) {
+      setState(() {
+        _dueAt = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _dueAt?.hour ?? 0,
+          _dueAt?.minute ?? 0,
+        );
+      });
+    }
+  }
+
+  Future<void> _pickTime() async {
+    if (_dueAt == null) return;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_dueAt!),
+    );
+    if (picked != null) {
+      setState(() {
+        _dueAt = DateTime(
+          _dueAt!.year,
+          _dueAt!.month,
+          _dueAt!.day,
+          picked.hour,
+          picked.minute,
+        );
+      });
+    }
   }
 
   void _submit() {
@@ -622,9 +737,7 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
         description: _descCtrl.text.trim().isEmpty
             ? null
             : _descCtrl.text.trim(),
-        dueAt: _dueAt != null
-            ? DateTime(_dueAt!.year, _dueAt!.month, _dueAt!.day)
-            : null,
+        dueAt: _dueAt,
         priority: _priority,
         schemeId: _schemeId,
         siteId: _siteId,
@@ -702,6 +815,16 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
                   ),
                 ),
                 if (_dueAt != null) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _pickTime,
+                    icon: const Icon(Icons.access_time_outlined),
+                    label: Text(
+                      _dueAt!.hour == 0 && _dueAt!.minute == 0
+                          ? 'Add due time'
+                          : 'Due time: ${_dueAt!.hour.toString().padLeft(2, '0')}:${_dueAt!.minute.toString().padLeft(2, '0')}',
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Align(
                     alignment: Alignment.centerRight,

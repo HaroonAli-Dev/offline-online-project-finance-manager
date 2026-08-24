@@ -11,6 +11,13 @@ import '../features/progress/presentation/progress_page.dart';
 import '../features/reminders/presentation/reminders_page.dart';
 import '../features/vehicles/presentation/vehicles_page.dart';
 
+const appLogoAsset = 'lib/assests/images/logo/logo.png';
+
+final appTheme = ThemeData(
+  colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B5E20)),
+  useMaterial3: true,
+);
+
 class App extends StatelessWidget {
   const App({super.key});
 
@@ -19,10 +26,7 @@ class App extends StatelessWidget {
     return MaterialApp(
       title: 'Finance & Construction Manager',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B5E20)),
-        useMaterial3: true,
-      ),
+      theme: appTheme,
       home: const MainNavigationShell(),
     );
   }
@@ -74,10 +78,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         labelType: NavigationRailLabelType.all,
                         leading: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Icon(
-                            Icons.architecture,
-                            color: Theme.of(context).colorScheme.primary,
-                            size: 32,
+                          child: Image.asset(
+                            appLogoAsset,
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.contain,
                           ),
                         ),
                         destinations: const [

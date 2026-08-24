@@ -70,6 +70,7 @@ class AppDatabase extends _$AppDatabase {
       await _createProgressUpdatesIndexes();
       await _createAttachmentsIndexes();
       await _createRemindersIndexes();
+      await _createReminderEntityLinkIndexes();
     },
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {

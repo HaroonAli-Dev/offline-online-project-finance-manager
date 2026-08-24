@@ -4,7 +4,7 @@
 **Project Name:** Finance & Construction Manager  
 **Project Type:** Offline-first finance and construction management system  
 **Primary Client:** Single client initially; architecture should remain scalable for future multi-organization use  
-**Last Updated:** August 19, 2026
+**Last Updated:** August 21, 2026
 
 ---
 
@@ -108,8 +108,6 @@ Core rule:
 
 ## Remaining active work
 
-- [ ] Final reminders/calendar enhancements
-- [ ] Dashboard validation and polish
 - [ ] Android validation and packaging
 - [ ] Web/PWA offline validation
 - [ ] Supabase auth and sync design
@@ -178,12 +176,23 @@ Status: Complete
 
 ## Phase 11 — Reminders & Calendar
 
-Status: Baseline complete; enhancements pending
+Status: Complete
 
 - [x] Reminder repository, filtering, and UI
-- [ ] Calendar grouping/date selection
-- [ ] Expanded relationship support for more entities
-- [ ] Due-time and notification scheduling abstraction
+- [x] Calendar/date selection with offline selected-day filtering
+- [x] Normalized relationships for Schemes, Sites, Bills, Progress, and People
+- [x] Explicit repository queries, getById, restore, and deterministic ordering
+- [x] Optional due-time picker and time-aware persistence/overdue logic
+- [x] Local notification scheduling, cancellation, rescheduling, and deterministic IDs
+- [x] SyncOutbox integration for reminder lifecycle operations
+- [x] Repository, relationship, query, migration, and notification abstraction tests
+- [x] Non-destructive schema migration for reminder entity links
+
+Limitations:
+
+- Web/PWA skips `flutter_local_notifications` scheduling because browser background scheduling is not supported by the package; calendar and reminder CRUD remain fully available offline.
+- Native notification permission and platform manifest configuration remain platform-specific deployment work.
+- Supabase synchronization and authentication remain future phases.
 
 ## Phase 12 — Dashboard
 
@@ -192,6 +201,30 @@ Status: Complete and validated
 - [x] Summary cards and quick actions
 - [x] Upcoming reminders and budget utilization
 - [x] Responsive dashboard layout
+- [x] Local database/provider statistics validation
+- [x] Reminder due-date, due-time, completion, and soft-delete validation
+- [x] Loading, empty, error-safe, and offline behavior validation
+- [x] Narrow-width overflow validation and responsive card polish
+- [x] Dashboard widget tests for data, reminders, empty state, and phone layout
+
+## Pre-release Stabilization Audit
+
+Status: Complete for the local application
+
+- [x] Completed modules, repositories, providers, navigation, and shared services audited
+- [x] Drift schema, migration history, indexes, soft-delete behavior, and SyncOutbox verified
+- [x] Offline CRUD, relationship, validation, attachment, reminder, and Dashboard tests validated
+- [x] File/path safety and cross-platform conditional APIs reviewed
+- [x] Responsive UI and empty/loading/error-state behavior reviewed
+- [x] Full analyzer, test suite, and Windows release build integrity checks passed
+
+Remaining before production release:
+
+- [ ] Windows client/release validation
+- [ ] Android validation and packaging
+- [ ] Web/PWA offline validation
+- [ ] Production security hardening and deployment checks
+- [ ] Supabase authentication, synchronization, and storage design
 
 ---
 

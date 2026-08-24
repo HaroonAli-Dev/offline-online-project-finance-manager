@@ -1,19 +1,23 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'app.dart';
+import '../core/config/supabase_config.dart';
 import '../core/database/app_database.dart';
-import '../core/providers/database_provider.dart';
+import 'startup_app.dart';
 
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final database = AppDatabase();
-  await database.validateConnection();
+  await SupabaseConfig.initialize();
+  final databaseFuture = _initializeDatabase();
+  runApp(StartupApp(databaseFuture: databaseFuture));
+}
 
-  runApp(
-    ProviderScope(
-      overrides: [appDatabaseProvider.overrideWithValue(database)],
-      child: const App(),
-    ),
-  );
+Future<AppDatabase> _initializeDatabase() async {
+  final database = AppDatabase();
+  try {
+    await database.validateConnection();
+    return database;
+  } catch (_) {
+    await database.close();
+    rethrow;
+  }
 }

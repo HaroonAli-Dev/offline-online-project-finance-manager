@@ -28,9 +28,10 @@ dependencies:
   flutter_local_notifications:
   supabase_flutter:
   pdf:
-  printing:
+  printing: 5.15.0
   csv: ^8.0.0
   url_launcher: ^6.3.1
+  timezone: 0.11.1
 
 dev_dependencies:
   flutter_test:
@@ -42,3 +43,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - lib/assests/images/logo/logo.png

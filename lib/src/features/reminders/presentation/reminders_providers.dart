@@ -21,6 +21,10 @@ final remindersDoneFilterProvider = StateProvider.autoDispose<bool?>(
   (ref) => null,
 );
 
+final remindersSelectedDateProvider = StateProvider.autoDispose<DateTime?>(
+  (ref) => null,
+);
+
 final remindersSchemeFilterProvider = StateProvider.autoDispose<String?>(
   (ref) => null,
 );
@@ -44,7 +48,8 @@ final remindersProvider = StreamProvider.autoDispose<List<ReminderModel>>((
 });
 
 /// Pending reminders that are overdue or due within the next 7 days.
-/// Used by the Dashboard. Returns at most 5 items ordered by dueAt ASC.
+/// Undated reminders stay in the Reminders screen and are not actionable
+/// upcoming items for the Dashboard.
 final dashboardUpcomingRemindersProvider = StreamProvider<List<ReminderModel>>((
   ref,
 ) {
@@ -54,7 +59,7 @@ final dashboardUpcomingRemindersProvider = StreamProvider<List<ReminderModel>>((
       .map((all) {
         final cutoff = DateTime.now().toUtc().add(const Duration(days: 7));
         return all
-            .where((r) => r.dueAt == null || r.dueAt!.isBefore(cutoff))
+            .where((r) => r.dueAt != null && !r.dueAt!.isAfter(cutoff))
             .take(5)
             .toList();
       });

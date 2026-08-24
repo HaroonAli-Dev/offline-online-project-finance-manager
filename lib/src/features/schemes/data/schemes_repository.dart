@@ -134,6 +134,7 @@ class SchemesRepository {
     String? description,
   }) async {
     final now = DateTime.now().toUtc();
+    final normalizedProgress = _progressForStatus(status, progressPercentage);
 
     await _database.transaction(() async {
       await (_database.update(
@@ -148,7 +149,7 @@ class SchemesRepository {
           startDate: Value(startDate?.toUtc()),
           endDate: Value(endDate?.toUtc()),
           status: Value(status.trim()),
-          progressPercentage: Value(progressPercentage.clamp(0.0, 100.0)),
+          progressPercentage: Value(normalizedProgress),
           incompleteReason: Value(_cleanOptional(incompleteReason)),
           result: Value(_cleanOptional(result)),
           description: Value(_cleanOptional(description)),
@@ -175,6 +176,14 @@ class SchemesRepository {
       );
       await _enqueueChange('scheme', id, 'delete', now);
     });
+  }
+
+  double _progressForStatus(String status, double progressPercentage) {
+    return switch (status.trim()) {
+      'completed' => 100.0,
+      'initial' || 'incomplete' => 0.0,
+      _ => progressPercentage.clamp(0.0, 100.0),
+    };
   }
 
   Future<void> _enqueueChange(

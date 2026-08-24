@@ -106,4 +106,41 @@ void main() {
     expect(completedSchemes, hasLength(1));
     expect(completedSchemes.single.name, 'Scheme Beta');
   });
+
+  test(
+    'status changes normalize completed and reset initial/incomplete progress',
+    () async {
+      await schemesRepository.createScheme(
+        schemeCode: 'SCH-PROGRESS',
+        name: 'Progress Status Scheme',
+        budget: 1000.0,
+      );
+      var scheme = (await schemesRepository.watchSchemes().first).single;
+
+      Future<void> updateStatus(String status) {
+        return schemesRepository.updateScheme(
+          id: scheme.id,
+          schemeCode: scheme.schemeCode,
+          name: scheme.name,
+          budget: scheme.budget,
+          status: status,
+          progressPercentage: scheme.progressPercentage,
+        );
+      }
+
+      await updateStatus('completed');
+      scheme = (await schemesRepository.watchSchemes().first).single;
+      expect(scheme.progressPercentage, 100.0);
+
+      await updateStatus('initial');
+      scheme = (await schemesRepository.watchSchemes().first).single;
+      expect(scheme.progressPercentage, 0.0);
+
+      await updateStatus('completed');
+      scheme = (await schemesRepository.watchSchemes().first).single;
+      await updateStatus('incomplete');
+      scheme = (await schemesRepository.watchSchemes().first).single;
+      expect(scheme.progressPercentage, 0.0);
+    },
+  );
 }
