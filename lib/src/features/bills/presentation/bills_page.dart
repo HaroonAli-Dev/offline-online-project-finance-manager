@@ -6,6 +6,7 @@ import '../../../core/utils/async_value_extensions.dart';
 import '../../../core/widgets/hint_banner.dart';
 import '../../documents/presentation/entity_attachments_page.dart';
 import '../../documents/presentation/attachments_panel.dart';
+import '../../documents/presentation/attachments_providers.dart';
 import '../../schemes/presentation/schemes_providers.dart';
 import '../data/bills_repository.dart';
 import '../domain/bill_model.dart';
@@ -125,6 +126,10 @@ Future<void> showBillForm(
   BillModel? bill,
   String? preselectedSchemeId,
 }) async {
+  final attachmentsRepository = ProviderScope.containerOf(
+    context,
+    listen: false,
+  ).read(attachmentsRepositoryProvider);
   final input = await showDialog<BillInput>(
     context: context,
     builder: (_) => BillFormDialog(
@@ -146,10 +151,12 @@ Future<void> showBillForm(
         status: input.status,
         remarks: input.remarks,
       );
-      if (context.mounted) {
-        await showDialog<void>(
-          context: context,
-          builder: (_) => _BillAttachmentsDialog(billId: createdBillId),
+      for (final draft in input.pendingAttachments) {
+        await persistAttachmentDraft(
+          repo: attachmentsRepository,
+          draft: draft,
+          entityType: 'bill',
+          entityId: createdBillId,
         );
       }
     } else {
@@ -175,32 +182,6 @@ Future<void> showBillForm(
         const SnackBar(content: Text('Could not save bill. Please try again.')),
       );
     }
-  }
-}
-
-/// The second state of Add Bill: the bill now has a real local UUID, so the
-/// shared offline-first attachment pipeline can safely be used.
-class _BillAttachmentsDialog extends StatelessWidget {
-  const _BillAttachmentsDialog({required this.billId});
-
-  final String billId;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Add Photos/Documents'),
-      scrollable: true,
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: AttachmentsPanel(entityType: 'bill', entityId: billId),
-      ),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Done'),
-        ),
-      ],
-    );
   }
 }
 
@@ -275,19 +256,11 @@ class _BillsFilters extends StatelessWidget {
         const SizedBox(height: 16),
         Text('Bill type', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: typeChips,
-        ),
+        Wrap(spacing: 8, runSpacing: 8, children: typeChips),
         const SizedBox(height: 16),
         Text('Status', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: statusChips,
-        ),
+        Wrap(spacing: 8, runSpacing: 8, children: statusChips),
       ],
     );
 

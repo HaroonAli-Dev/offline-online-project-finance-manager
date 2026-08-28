@@ -4,7 +4,7 @@
 **Project Name:** Finance & Construction Manager  
 **Project Type:** Offline-first finance and construction management system  
 **Primary Client:** Single client initially; architecture should remain scalable for future multi-organization use  
-**Last Updated:** August 21, 2026
+**Last Updated:** August 28, 2026
 
 ---
 
@@ -108,8 +108,8 @@ Core rule:
 
 ## Remaining active work
 
-- [ ] Android validation and packaging
-- [ ] Web/PWA offline validation
+- [ ] Android validation and packaging (APK result still needs confirmed build output)
+- [x] Web/PWA offline validation
 - [ ] Supabase auth and sync design
 - [ ] Production security checks
 
@@ -220,9 +220,9 @@ Status: Complete for the local application
 
 Remaining before production release:
 
-- [ ] Windows client/release validation (Build currently fails on CMake MSB3073)
-- [ ] Android validation and packaging
-- [ ] Web/PWA offline validation
+- [x] Windows client/release validation
+- [ ] Android validation and packaging (APK result still needs confirmed build output)
+- [x] Web/PWA offline validation
 
 ---
 
@@ -243,8 +243,8 @@ Open items before production readiness:
 - [x] Authentication
 - [x] Supabase sync layer
 - [x] Storage integration
-- [ ] Web/PWA validation
-- [ ] Android validation
+- [x] Web/PWA validation
+- [ ] Android validation (APK result still needs confirmed build output)
 - [x] Security hardening (RLS policies) applied
 - [ ] Final deployment checks
 

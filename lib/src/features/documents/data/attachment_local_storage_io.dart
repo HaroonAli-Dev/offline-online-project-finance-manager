@@ -16,3 +16,25 @@ Future<String?> saveAttachmentLocally(Uint8List bytes, String fileName) async {
   await target.writeAsBytes(bytes, flush: true);
   return target.path;
 }
+
+Future<Uint8List?> readAttachmentLocally(String? filePath) async {
+  if (filePath == null || filePath.trim().isEmpty) return null;
+  final file = File(filePath);
+  return await file.exists() ? file.readAsBytes() : null;
+}
+
+Future<void> deleteAttachmentLocally(String? filePath) async {
+  if (filePath == null || filePath.trim().isEmpty) return;
+  final file = File(filePath);
+  if (await file.exists()) await file.delete();
+}
+
+Future<bool> attachmentExistsLocally(String? filePath) async {
+  if (filePath == null || filePath.trim().isEmpty) return false;
+  return File(filePath).exists();
+}
+
+Future<String?> createAttachmentObjectUrl(String? filePath) async {
+  if (filePath == null || filePath.trim().isEmpty) return null;
+  return await File(filePath).exists() ? filePath : null;
+}

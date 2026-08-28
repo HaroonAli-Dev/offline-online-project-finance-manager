@@ -1,5 +1,8 @@
 import 'dart:typed_data';
 
-Future<Uint8List?> readFileBytes(String? filePath) async => null;
+import 'attachment_local_storage.dart';
 
-Future<bool> fileExists(String? filePath) async => false;
+Future<Uint8List?> readFileBytes(String? filePath) =>
+    readAttachmentLocally(filePath);
+
+Future<bool> fileExists(String? filePath) => attachmentExistsLocally(filePath);

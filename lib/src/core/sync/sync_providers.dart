@@ -18,7 +18,9 @@ final remoteSyncClientProvider = Provider<RemoteSyncClient?>((ref) {
 });
 
 /// Provider for [AttachmentStorageClient] using active Supabase instance when initialized.
-final attachmentStorageClientProvider = Provider<AttachmentStorageClient?>((ref) {
+final attachmentStorageClientProvider = Provider<AttachmentStorageClient?>((
+  ref,
+) {
   if (!SupabaseConfig.isInitialized) return null;
   try {
     return SupabaseAttachmentStorageClient(Supabase.instance.client);
@@ -51,6 +53,8 @@ final syncStatusStreamProvider = StreamProvider<SyncStatusSnapshot>((ref) {
 
 /// Notifier for triggering manual or automated sync runs and maintaining [SyncStatusSnapshot].
 class SyncNotifier extends Notifier<SyncStatusSnapshot> {
+  Future<bool>? _inFlight;
+
   @override
   SyncStatusSnapshot build() {
     final engine = ref.watch(syncEngineProvider);
@@ -63,6 +67,9 @@ class SyncNotifier extends Notifier<SyncStatusSnapshot> {
 
   /// Triggers a synchronization cycle for the currently authenticated user.
   Future<bool> synchronize() async {
+    final existing = _inFlight;
+    if (existing != null) return existing;
+
     final authState = ref.read(authStateProvider);
     if (!authState.isAuthenticated || authState.isOfflineBypass) {
       return false;
@@ -72,12 +79,17 @@ class SyncNotifier extends Notifier<SyncStatusSnapshot> {
     if (userId == null) return false;
 
     final engine = ref.read(syncEngineProvider);
-    return engine.sync(userId: userId);
+    final future = engine.sync(userId: userId);
+    _inFlight = future;
+    future.whenComplete(() {
+      if (identical(_inFlight, future)) _inFlight = null;
+    });
+    return future;
   }
 }
 
 /// Provider exposing [SyncNotifier] for user-facing sync triggers.
 final syncControllerProvider =
     NotifierProvider<SyncNotifier, SyncStatusSnapshot>(() {
-  return SyncNotifier();
-});
+      return SyncNotifier();
+    });

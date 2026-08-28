@@ -10,7 +10,9 @@ import '../../../core/sync/sync_providers.dart';
 import '../data/attachment_local_storage.dart';
 import '../data/attachment_picker_service.dart';
 import '../data/attachment_storage_service.dart';
+import '../data/attachments_repository.dart';
 import '../data/image_compression_service.dart';
+import '../domain/attachment_draft.dart';
 import '../domain/attachment_model.dart';
 import 'attachments_providers.dart';
 
@@ -51,28 +53,24 @@ class AttachmentsPanel extends ConsumerWidget {
               ),
             ),
             const Spacer(),
-            PopupMenuButton<_AttachmentSource>(
+            PopupMenuButton<AttachmentSource>(
               tooltip: 'Add attachment',
               onSelected: (source) => _addAttachment(context, ref, source),
               itemBuilder: (_) => const [
                 PopupMenuItem(
-                  value: _AttachmentSource.file,
+                  value: AttachmentSource.file,
                   child: Text('Choose document/file'),
                 ),
                 PopupMenuItem(
-                  value: _AttachmentSource.gallery,
+                  value: AttachmentSource.gallery,
                   child: Text('Choose photo'),
                 ),
                 PopupMenuItem(
-                  value: _AttachmentSource.camera,
+                  value: AttachmentSource.camera,
                   child: Text('Take photo'),
                 ),
               ],
-              child: const IconButton(
-                icon: Icon(Icons.add),
-                tooltip: 'Add attachment',
-                onPressed: null,
-              ),
+              icon: const Icon(Icons.add),
             ),
           ],
         ),
@@ -108,57 +106,18 @@ class AttachmentsPanel extends ConsumerWidget {
   Future<void> _addAttachment(
     BuildContext context,
     WidgetRef ref,
-    _AttachmentSource source,
+    AttachmentSource source,
   ) async {
-    final picked = switch (source) {
-      _AttachmentSource.file => await AttachmentPickerService.pickFile(),
-      _AttachmentSource.gallery => await AttachmentPickerService.selectPhoto(),
-      _AttachmentSource.camera => await AttachmentPickerService.takePhoto(),
-    };
-    if (picked == null || !context.mounted) return;
-
-    // Show description + category dialog
-    final input = await showDialog<_AttachmentInput>(
-      context: context,
-      builder: (_) => _AttachmentInputDialog(
-        fileName: picked.fileName,
-        mimeType: picked.mimeType,
-      ),
-    );
-    if (input == null || !context.mounted) return;
+    final draft = await pickAttachmentDraft(context, source);
+    if (draft == null || !context.mounted) return;
 
     final repo = ref.read(attachmentsRepositoryProvider);
     try {
-      var bytes = picked.bytes;
-      var fileName = picked.fileName;
-      var mimeType = picked.mimeType;
-      int? width;
-      int? height;
-      if ((mimeType ?? '').startsWith('image/') && bytes != null) {
-        final image = ImageCompressionService.process(bytes);
-        bytes = image.bytes;
-        mimeType = image.mimeType;
-        fileName = '${fileName.split('.').first}.jpg';
-        width = image.width;
-        height = image.height;
-      }
-      final storedPath = bytes == null
-          ? picked.filePath
-          : await saveAttachmentLocally(bytes, fileName);
-      await repo.createAttachment(
+      await persistAttachmentDraft(
+        repo: repo,
+        draft: draft,
         entityType: entityType,
         entityId: entityId,
-        filePath: storedPath,
-        fileName: fileName,
-        mimeType: mimeType,
-        fileSize: bytes?.length ?? picked.size,
-        imageWidth: width,
-        imageHeight: height,
-        category: input.category,
-        description: input.description,
-        capturedAt: DateTime.now().toUtc(),
-        latitude: input.latitude,
-        longitude: input.longitude,
       );
       if (context.mounted) {
         ScaffoldMessenger.of(context)
@@ -306,8 +265,7 @@ class _AttachmentTileState extends ConsumerState<_AttachmentTile> {
             IconButton(
               icon: const Icon(Icons.open_in_new, size: 18),
               tooltip: 'Open file',
-              onPressed: () =>
-                  FileLauncherService.openFile(attachment.filePath!),
+              onPressed: () => _openLocalAttachment(context, attachment),
             )
           else if (hasCloudFile)
             IconButton(
@@ -324,24 +282,79 @@ class _AttachmentTileState extends ConsumerState<_AttachmentTile> {
       ),
     );
   }
+
+  Future<void> _openLocalAttachment(
+    BuildContext context,
+    AttachmentModel attachment,
+  ) async {
+    final reference = await createAttachmentObjectUrl(attachment.filePath);
+    if (reference != null && context.mounted) {
+      await FileLauncherService.openFile(reference);
+    }
+  }
 }
 
-// ---------------------------------------------------------------------------
-// Input dialog
-// ---------------------------------------------------------------------------
+enum AttachmentSource { file, gallery, camera }
 
-class _AttachmentInput {
-  const _AttachmentInput({
-    required this.category,
-    this.description,
-    this.latitude,
-    this.longitude,
-  });
+Future<AttachmentDraft?> pickAttachmentDraft(
+  BuildContext context,
+  AttachmentSource source,
+) async {
+  final picked = switch (source) {
+    AttachmentSource.file => await AttachmentPickerService.pickFile(),
+    AttachmentSource.gallery => await AttachmentPickerService.selectPhoto(),
+    AttachmentSource.camera => await AttachmentPickerService.takePhoto(),
+  };
+  if (picked == null || !context.mounted) return null;
 
-  final String category;
-  final String? description;
-  final double? latitude;
-  final double? longitude;
+  final input = await showDialog<AttachmentInput>(
+    context: context,
+    builder: (_) => _AttachmentInputDialog(
+      fileName: picked.fileName,
+      mimeType: picked.mimeType,
+    ),
+  );
+  if (input == null || !context.mounted) return null;
+  return AttachmentDraft(file: picked, input: input);
+}
+
+Future<void> persistAttachmentDraft({
+  required AttachmentsRepository repo,
+  required AttachmentDraft draft,
+  required String entityType,
+  required String entityId,
+}) async {
+  var bytes = draft.file.bytes;
+  var fileName = draft.file.fileName;
+  var mimeType = draft.file.mimeType;
+  int? width;
+  int? height;
+  if ((mimeType ?? '').startsWith('image/') && bytes != null) {
+    final image = ImageCompressionService.process(bytes);
+    bytes = image.bytes;
+    mimeType = image.mimeType;
+    fileName = '${fileName.split('.').first}.jpg';
+    width = image.width;
+    height = image.height;
+  }
+  final storedPath = bytes == null
+      ? draft.file.filePath
+      : await saveAttachmentLocally(bytes, fileName);
+  await repo.createAttachment(
+    entityType: entityType,
+    entityId: entityId,
+    filePath: storedPath,
+    fileName: fileName,
+    mimeType: mimeType,
+    fileSize: bytes?.length ?? draft.file.size,
+    imageWidth: width,
+    imageHeight: height,
+    category: draft.input.category,
+    description: draft.input.description,
+    capturedAt: DateTime.now().toUtc(),
+    latitude: draft.input.latitude,
+    longitude: draft.input.longitude,
+  );
 }
 
 class _AttachmentInputDialog extends StatefulWidget {
@@ -478,7 +491,7 @@ class _AttachmentInputDialogState extends State<_AttachmentInputDialog> {
           onPressed: () {
             Navigator.pop(
               context,
-              _AttachmentInput(
+              AttachmentInput(
                 category: _category,
                 description: _descController.text.trim().isEmpty
                     ? null
@@ -509,5 +522,3 @@ class _AttachmentInputDialogState extends State<_AttachmentInputDialog> {
     }
   }
 }
-
-enum _AttachmentSource { file, gallery, camera }

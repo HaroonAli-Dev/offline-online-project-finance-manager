@@ -104,7 +104,10 @@ class ProgressPage extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Progress Tracking')),
+      appBar: AppBar(
+        title: const Text('Progress Tracking'),
+        actions: const [PageHelpIconButton(pageKey: 'progress')],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showProgressForm(context, ref),
         icon: const Icon(Icons.add),

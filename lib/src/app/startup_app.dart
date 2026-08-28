@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/database/app_database.dart';
 import '../core/providers/database_provider.dart';
+import '../core/sync/sync_trigger_controller.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/providers/auth_provider.dart';
 import 'app.dart';
@@ -52,7 +53,9 @@ class _StartupGate extends StatelessWidget {
               : ProviderScope(
                   key: const ValueKey('application'),
                   overrides: [appDatabaseProvider.overrideWithValue(database)],
-                  child: readyChild ?? const _AuthGate(),
+                  child: SyncTriggerHost(
+                    child: readyChild ?? const _AuthGate(),
+                  ),
                 ),
         );
       },

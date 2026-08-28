@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/async_value_extensions.dart';
+import '../../../core/widgets/hint_banner.dart';
 
 import '../../schemes/presentation/schemes_providers.dart';
 import '../../sites/presentation/sites_providers.dart';
@@ -23,8 +24,22 @@ class RemindersPage extends ConsumerWidget {
     final selectedDone = ref.watch(remindersDoneFilterProvider);
     final repository = ref.read(remindersRepositoryProvider);
 
+    const hint = HintBanner(
+      pageKey: 'reminders',
+      icon: Icons.notifications_active_outlined,
+      hints: [
+        'Create reminders for important construction and financial tasks.',
+        'Link a reminder to a scheme or site when the task belongs to a project.',
+        'Use priority and completion filters to focus on outstanding work.',
+        'Due dates and times are stored locally and remain available offline.',
+      ],
+    );
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Reminders')),
+      appBar: AppBar(
+        title: const Text('Reminders'),
+        actions: const [PageHelpIconButton(pageKey: 'reminders')],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showReminderForm(context, repository, schemes, sites),
         icon: const Icon(Icons.add_alert_outlined),
@@ -60,12 +75,19 @@ class RemindersPage extends ConsumerWidget {
           );
 
           if (isWide) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            return Column(
               children: [
-                SizedBox(width: 280, child: filters),
-                const VerticalDivider(width: 1),
-                Expanded(child: list),
+                hint,
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(width: 280, child: filters),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: list),
+                    ],
+                  ),
+                ),
               ],
             );
           }
@@ -73,7 +95,12 @@ class RemindersPage extends ConsumerWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SingleChildScrollView(child: filters),
+              SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [hint, filters],
+                ),
+              ),
               Expanded(child: list),
             ],
           );
@@ -626,14 +653,16 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
       context,
       _ReminderInput(
         title: _titleCtrl.text.trim(),
-        description:
-            _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+        description: _descCtrl.text.trim().isEmpty
+            ? null
+            : _descCtrl.text.trim(),
         dueAt: _dueAt,
         priority: _priority,
         schemeId: _schemeId,
         siteId: _siteId,
-        remarks:
-            _remarksCtrl.text.trim().isEmpty ? null : _remarksCtrl.text.trim(),
+        remarks: _remarksCtrl.text.trim().isEmpty
+            ? null
+            : _remarksCtrl.text.trim(),
       ),
     );
   }
@@ -661,8 +690,9 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
                     labelText: 'Title *',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Title is required'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -774,14 +804,18 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
                               vertical: 12,
                             ),
                           ),
-                          items: List.generate(12, (i) => DateTime.now().year + i - 1)
-                              .map(
-                                (y) => DropdownMenuItem(
-                                  value: y,
-                                  child: Text(y.toString()),
-                                ),
-                              )
-                              .toList(),
+                          items:
+                              List.generate(
+                                    12,
+                                    (i) => DateTime.now().year + i - 1,
+                                  )
+                                  .map(
+                                    (y) => DropdownMenuItem(
+                                      value: y,
+                                      child: Text(y.toString()),
+                                    ),
+                                  )
+                                  .toList(),
                           onChanged: (v) => setState(() {
                             _year = v ?? _year;
                             final newMax = _daysInMonth(_year, _month);
@@ -796,8 +830,7 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
                     children: [
                       Checkbox(
                         value: _hasTime,
-                        onChanged: (v) =>
-                            setState(() => _hasTime = v ?? false),
+                        onChanged: (v) => setState(() => _hasTime = v ?? false),
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -845,14 +878,17 @@ class _ReminderFormDialogState extends State<_ReminderFormDialog> {
                                 vertical: 12,
                               ),
                             ),
-                            items: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
-                                .map(
-                                  (m) => DropdownMenuItem(
-                                    value: m,
-                                    child: Text(m.toString().padLeft(2, '0')),
-                                  ),
-                                )
-                                .toList(),
+                            items:
+                                [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+                                    .map(
+                                      (m) => DropdownMenuItem(
+                                        value: m,
+                                        child: Text(
+                                          m.toString().padLeft(2, '0'),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
                             onChanged: (v) =>
                                 setState(() => _minute = v ?? _minute),
                           ),

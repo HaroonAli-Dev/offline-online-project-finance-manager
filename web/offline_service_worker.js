@@ -7,10 +7,10 @@ const appShell = [
   './manifest.json',
   './sqlite3.wasm',
   './drift_worker.js',
-  './icons/AppIcon-192.png',
-  './icons/AppIcon-512.png',
-  './icons/AppIcon-maskable-192.png',
-  './icons/AppIcon-maskable-512.png',
+  './icons/Icon-192.png',
+  './icons/Icon-512.png',
+  './icons/Icon-maskable-192.png',
+  './icons/Icon-maskable-512.png',
 ];
 
 self.addEventListener('install', (event) => {

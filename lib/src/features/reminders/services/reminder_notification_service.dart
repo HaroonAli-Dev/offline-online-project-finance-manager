@@ -10,6 +10,11 @@ class ReminderNotificationService {
   final FlutterLocalNotificationsPlugin _plugin;
   bool _initialized = false;
 
+  static const _windowsAppUserModelId =
+      'FinanceConstructionManager.ReminderNotifications.1';
+  static const _windowsNotificationGuid =
+      '8f4c1d8e-4d47-4e2e-b0f8-6f9c7b8d3a21';
+
   static int notificationId(String reminderId) {
     var hash = 0x811c9dc5;
     for (final codeUnit in reminderId.codeUnits) {
@@ -26,6 +31,11 @@ class ReminderNotificationService {
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         iOS: DarwinInitializationSettings(),
+        windows: WindowsInitializationSettings(
+          appName: 'Finance & Construction Manager',
+          appUserModelId: _windowsAppUserModelId,
+          guid: _windowsNotificationGuid,
+        ),
       ),
     );
     _initialized = initialized ?? false;
@@ -55,6 +65,10 @@ class ReminderNotificationService {
             priority: Priority.high,
           ),
           iOS: DarwinNotificationDetails(),
+          windows: WindowsNotificationDetails(
+            duration: WindowsNotificationDuration.long,
+            timestamp: null,
+          ),
         ),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       );

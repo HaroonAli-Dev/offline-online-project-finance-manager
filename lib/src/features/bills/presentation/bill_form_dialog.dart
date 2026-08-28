@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../schemes/domain/scheme_model.dart';
+import '../../documents/domain/attachment_draft.dart';
 import '../../documents/presentation/attachments_panel.dart';
 import '../domain/bill_model.dart';
 
@@ -15,6 +16,7 @@ class BillInput {
     required this.amount,
     required this.status,
     this.remarks,
+    this.pendingAttachments = const [],
   });
 
   final String schemeId;
@@ -24,6 +26,7 @@ class BillInput {
   final double amount;
   final String status;
   final String? remarks;
+  final List<AttachmentDraft> pendingAttachments;
 }
 
 class BillFormDialog extends StatefulWidget {
@@ -54,6 +57,8 @@ class _BillFormDialogState extends State<BillFormDialog> {
   late String _selectedBillType;
   late DateTime _billDate;
   late String _selectedStatus;
+  final List<AttachmentDraft> _pendingAttachments = [];
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -90,7 +95,14 @@ class _BillFormDialogState extends State<BillFormDialog> {
     if (picked != null) setState(() => _billDate = picked);
   }
 
-  void _submit() {
+  Future<void> _addAttachment(AttachmentSource source) async {
+    final draft = await pickAttachmentDraft(context, source);
+    if (draft != null && mounted) {
+      setState(() => _pendingAttachments.add(draft));
+    }
+  }
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedSchemeId == null) {
       ScaffoldMessenger.of(
@@ -100,6 +112,7 @@ class _BillFormDialogState extends State<BillFormDialog> {
     }
 
     final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
+    setState(() => _isSaving = true);
     Navigator.pop(
       context,
       BillInput(
@@ -114,6 +127,7 @@ class _BillFormDialogState extends State<BillFormDialog> {
         remarks: _remarksController.text.trim().isEmpty
             ? null
             : _remarksController.text.trim(),
+        pendingAttachments: List.unmodifiable(_pendingAttachments),
       ),
     );
   }
@@ -270,7 +284,12 @@ class _BillFormDialogState extends State<BillFormDialog> {
               if (isEdit)
                 AttachmentsPanel(entityType: 'bill', entityId: widget.bill!.id)
               else
-                const _PendingBillAttachmentsNotice(),
+                _PendingBillAttachments(
+                  attachments: _pendingAttachments,
+                  onAdd: _addAttachment,
+                  onRemove: (index) =>
+                      setState(() => _pendingAttachments.removeAt(index)),
+                ),
             ],
           ),
         ),
@@ -281,7 +300,7 @@ class _BillFormDialogState extends State<BillFormDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _submit,
+          onPressed: _isSaving ? null : _submit,
           child: Text(isEdit ? 'Save Changes' : 'Add Bill'),
         ),
       ],
@@ -291,8 +310,16 @@ class _BillFormDialogState extends State<BillFormDialog> {
 
 /// Avoids orphan files: an attachment needs the UUID created when the bill is
 /// saved. The creation workflow opens the same attachment experience next.
-class _PendingBillAttachmentsNotice extends StatelessWidget {
-  const _PendingBillAttachmentsNotice();
+class _PendingBillAttachments extends StatelessWidget {
+  const _PendingBillAttachments({
+    required this.attachments,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  final List<AttachmentDraft> attachments;
+  final ValueChanged<AttachmentSource> onAdd;
+  final ValueChanged<int> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -301,20 +328,76 @@ class _PendingBillAttachmentsNotice extends StatelessWidget {
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Padding(
-        padding: EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(Icons.attach_file),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Attachments\nSave the bill first to add attachments.',
-              ),
+            Text('Attachments', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            const Text('Selected files will be linked when the bill is saved.'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => onAdd(AttachmentSource.gallery),
+                  icon: const Icon(Icons.image_outlined),
+                  label: const Text('Add Image'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => onAdd(AttachmentSource.file),
+                  icon: const Icon(Icons.description_outlined),
+                  label: const Text('Add Document/PDF'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => onAdd(AttachmentSource.camera),
+                  icon: const Icon(Icons.camera_alt_outlined),
+                  label: const Text('Camera'),
+                ),
+              ],
             ),
+            if (attachments.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('No files selected.'),
+              )
+            else
+              ...attachments.asMap().entries.map(
+                (entry) => _PendingAttachmentTile(
+                  draft: entry.value,
+                  onRemove: () => onRemove(entry.key),
+                ),
+              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PendingAttachmentTile extends StatelessWidget {
+  const _PendingAttachmentTile({required this.draft, required this.onRemove});
+
+  final AttachmentDraft draft;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = draft.file.bytes;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      leading: bytes != null && (draft.file.mimeType ?? '').startsWith('image/')
+          ? Image.memory(bytes, width: 40, height: 40, fit: BoxFit.cover)
+          : const Icon(Icons.attach_file),
+      title: Text(draft.file.fileName, overflow: TextOverflow.ellipsis),
+      subtitle: Text(draft.input.category),
+      trailing: IconButton(
+        icon: const Icon(Icons.delete_outline),
+        tooltip: 'Remove selected attachment',
+        onPressed: onRemove,
       ),
     );
   }

@@ -370,6 +370,27 @@ Supabase PostgreSQL (Scoped by auth.uid() = user_id)
 
 ## Running the App
 
+### Configure Supabase
+
+The application remains fully usable offline when Supabase is not configured. To
+enable authentication, cloud synchronization, and Storage uploads:
+
+1. Create or open the Supabase project.
+2. Run the SQL files in `supabase/migrations/` in the project SQL editor.
+3. Copy the project URL and its public publishable key from **Project Settings
+    > API**. Do not use a service-role key in the application.
+4. Start Flutter with both compile-time defines:
+
+```powershell
+flutter run -d windows `
+   --dart-define=SUPABASE_URL=https://your-project.supabase.co `
+   --dart-define=SUPABASE_PUBLISHABLE_KEY=your-public-publishable-key
+```
+
+For a web or Android build, use the same two `--dart-define` values with the
+corresponding Flutter command. If either value is missing, the app intentionally
+prints a configuration warning and continues in offline-only mode.
+
 ```powershell
 # Install dependencies (first time only):
 flutter pub get
@@ -378,7 +399,7 @@ flutter pub get
 flutter run -d windows
 
 # Run with Supabase cloud credentials:
-flutter run -d windows --dart-define=SUPABASE_URL=https://xyz.supabase.co --dart-define=SUPABASE_ANON_KEY=ey...
+flutter run -d windows --dart-define=SUPABASE_URL=https://xyz.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=ey...
 ```
 
 **Requirements:**
