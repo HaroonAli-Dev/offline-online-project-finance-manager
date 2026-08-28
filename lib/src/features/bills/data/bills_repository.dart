@@ -132,7 +132,11 @@ class BillsRepository {
   // Mutations
   // ---------------------------------------------------------------------------
 
-  Future<void> createBill({
+  /// Creates a bill locally and returns its stable UUID.
+  ///
+  /// Callers can use the returned ID immediately to link generic attachments
+  /// while the bill and its outbox entry remain safely offline.
+  Future<String> createBill({
     required String schemeId,
     required String billType,
     String? billNumber,
@@ -163,6 +167,7 @@ class BillsRepository {
           );
       await _enqueueChange('bill', billId, 'create', now);
     });
+    return billId;
   }
 
   Future<void> updateBill({

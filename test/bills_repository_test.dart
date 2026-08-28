@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:offline_finance_management_app/src/core/database/app_database.dart';
 import 'package:offline_finance_management_app/src/features/bills/data/bills_repository.dart';
+import 'package:offline_finance_management_app/src/features/documents/data/attachments_repository.dart';
 
 import 'package:offline_finance_management_app/src/features/schemes/data/schemes_repository.dart';
 import 'package:offline_finance_management_app/src/features/sites/data/sites_repository.dart';
@@ -13,6 +14,7 @@ void main() {
   late SitesRepository sitesRepository;
   late SchemesRepository schemesRepository;
   late BillsRepository billsRepository;
+  late AttachmentsRepository attachmentsRepository;
 
   /// Helper: create a scheme and return its id.
   Future<String> createScheme({String code = 'SCH-B01'}) async {
@@ -33,6 +35,7 @@ void main() {
     sitesRepository = SitesRepository(database, uuid);
     schemesRepository = SchemesRepository(database, uuid);
     billsRepository = BillsRepository(database, uuid);
+    attachmentsRepository = AttachmentsRepository(database, uuid);
   });
 
   tearDown(() => database.close());
@@ -60,6 +63,53 @@ void main() {
     expect(bill.status, 'draft');
     expect(bill.remarks, 'First submission');
     expect(bill.schemeId, schemeId);
+  });
+
+  test('new bill ID can immediately link an offline image and PDF attachment',
+      () async {
+    final schemeId = await createScheme(code: 'SCH-ATTACH');
+    final billId = await billsRepository.createBill(
+      schemeId: schemeId,
+      billType: 'initial',
+      billDate: DateTime(2026, 3, 1),
+      amount: 100000,
+    );
+
+    expect(billId, isNotEmpty);
+    expect((await billsRepository.watchBills().first).single.id, billId);
+
+    final imageId = await attachmentsRepository.createAttachment(
+      entityType: 'bill',
+      entityId: billId,
+      filePath: '/offline/photo.jpg',
+      fileName: 'photo.jpg',
+      mimeType: 'image/jpeg',
+      fileSize: 123,
+      category: 'photo',
+      capturedAt: DateTime.now(),
+    );
+    final pdfId = await attachmentsRepository.createAttachment(
+      entityType: 'bill',
+      entityId: billId,
+      filePath: '/offline/invoice.pdf',
+      fileName: 'invoice.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 456,
+      category: 'document',
+      capturedAt: DateTime.now(),
+    );
+
+    final attachments = await attachmentsRepository
+        .watchByEntity('bill', billId)
+        .first;
+    expect(attachments.map((attachment) => attachment.id), containsAll([imageId, pdfId]));
+    expect(attachments.every((attachment) => attachment.entityId == billId), isTrue);
+    expect(attachments.every((attachment) => attachment.storagePath == null), isTrue);
+
+    final outbox = await database.customSelect(
+      "SELECT entity_type, entity_id FROM sync_outbox WHERE entity_type = 'attachment'",
+    ).get();
+    expect(outbox.map((row) => row.read<String>('entity_id')), containsAll([imageId, pdfId]));
   });
 
   // --------------------------------------------------------------------------

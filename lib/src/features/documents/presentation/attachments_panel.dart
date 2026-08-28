@@ -43,7 +43,13 @@ class AttachmentsPanel extends ConsumerWidget {
           children: [
             const Icon(Icons.attach_file, size: 18),
             const SizedBox(width: 6),
-            Text('Attachments', style: Theme.of(context).textTheme.titleSmall),
+            Expanded(
+              child: Text(
+                'Attachments',
+                style: Theme.of(context).textTheme.titleSmall,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             const Spacer(),
             PopupMenuButton<_AttachmentSource>(
               tooltip: 'Add attachment',
@@ -62,10 +68,10 @@ class AttachmentsPanel extends ConsumerWidget {
                   child: Text('Take photo'),
                 ),
               ],
-              child: TextButton.icon(
+              child: const IconButton(
+                icon: Icon(Icons.add),
+                tooltip: 'Add attachment',
                 onPressed: null,
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Add'),
               ),
             ),
           ],
@@ -226,15 +232,16 @@ class _AttachmentTileState extends ConsumerState<_AttachmentTile> {
         bucket: AttachmentStorageService.defaultBucket,
         storagePath: storagePath,
       );
-      final localPath = await saveAttachmentLocally(bytes, widget.attachment.fileName);
+      final localPath = await saveAttachmentLocally(
+        bytes,
+        widget.attachment.fileName,
+      );
 
       if (localPath != null) {
         final db = ref.read(appDatabaseProvider);
-        await (db.update(db.attachments)..where((t) => t.id.equals(widget.attachment.id))).write(
-          AttachmentsCompanion(
-            filePath: Value(localPath),
-          ),
-        );
+        await (db.update(db.attachments)
+              ..where((t) => t.id.equals(widget.attachment.id)))
+            .write(AttachmentsCompanion(filePath: Value(localPath)));
         if (context.mounted) {
           await FileLauncherService.openFile(localPath);
         }
@@ -261,8 +268,10 @@ class _AttachmentTileState extends ConsumerState<_AttachmentTile> {
         ? Icons.description_outlined
         : Icons.attach_file;
 
-    final hasLocalFile = attachment.filePath != null && attachment.filePath!.isNotEmpty;
-    final hasCloudFile = attachment.storagePath != null && attachment.storagePath!.isNotEmpty;
+    final hasLocalFile =
+        attachment.filePath != null && attachment.filePath!.isNotEmpty;
+    final hasCloudFile =
+        attachment.storagePath != null && attachment.storagePath!.isNotEmpty;
 
     return ListTile(
       dense: true,

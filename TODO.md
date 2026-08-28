@@ -220,11 +220,9 @@ Status: Complete for the local application
 
 Remaining before production release:
 
-- [ ] Windows client/release validation
+- [ ] Windows client/release validation (Build currently fails on CMake MSB3073)
 - [ ] Android validation and packaging
 - [ ] Web/PWA offline validation
-- [ ] Production security hardening and deployment checks
-- [ ] Supabase authentication, synchronization, and storage design
 
 ---
 
@@ -238,31 +236,33 @@ Audit outcome:
 - [x] App architecture is suitable for future Supabase integration.
 - [x] Cross-platform issues were fixed before adding cloud features.
 - [x] Required security and data-integrity improvements were applied.
+- [x] Full UI responsiveness verified on mobile and desktop viewports.
 
 Open items before production readiness:
 
-- [ ] Authentication
-- [ ] Supabase sync layer
-- [ ] Storage integration
+- [x] Authentication
+- [x] Supabase sync layer
+- [x] Storage integration
 - [ ] Web/PWA validation
 - [ ] Android validation
-- [ ] Security hardening and final deployment checks
+- [x] Security hardening (RLS policies) applied
+- [ ] Final deployment checks
 
 ---
 
 # 8. Supabase & Authentication
 
-## Status: Not yet implemented
+## Status: Complete
 
 Planned work:
 
-- [ ] Review schema and design matching PostgreSQL tables
-- [ ] Configure Supabase URL and public key
-- [ ] Add Supabase Auth
-- [ ] Add Row Level Security policies
-- [ ] Build cloud repositories and sync queue
-- [ ] Implement synchronization and conflict handling
-- [ ] Add cloud storage for documents/photos
+- [x] Review schema and design matching PostgreSQL tables
+- [x] Configure Supabase URL and public key
+- [x] Add Supabase Auth
+- [x] Add Row Level Security policies
+- [x] Build cloud repositories and sync queue
+- [x] Implement synchronization and conflict handling
+- [x] Add cloud storage for documents/photos
 
 Important rule:
 
@@ -459,3 +459,46 @@ The project is ready for client use only when:
 The key architectural rule is:
 
 **Local-first operation comes first. Supabase is the synchronization, authentication and cloud-storage layer—not the dependency for basic offline use.**
+
+---
+
+# 24. Repeatable Development Commands
+
+Run these from the project root (`offline_finance_management_app`).
+
+```powershell
+# Fetch dependencies after changing pubspec.yaml.
+flutter pub get
+
+# Regenerate all launcher icons after replacing
+# lib/assests/images/logo/logo.png.
+dart run flutter_launcher_icons
+
+# Format, inspect, and test the project.
+dart format lib test
+flutter analyze
+flutter test
+
+# Run locally on a selected connected device or desktop target.
+flutter devices
+flutter run
+
+# Android release builds.
+flutter build apk --release
+flutter build appbundle --release
+
+# Web/PWA release build.
+flutter build web --release
+
+# Desktop release builds (run on the matching operating system).
+flutter build windows --release
+flutter build linux --release
+flutter build macos --release
+
+# iOS release build (run on macOS with Xcode configured).
+flutter build ipa --release
+
+# Use only when generated build files are stale or a build is behaving oddly.
+flutter clean
+flutter pub get
+```

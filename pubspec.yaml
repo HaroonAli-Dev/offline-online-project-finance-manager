@@ -38,8 +38,28 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
   build_runner: ^2.5.0
   drift_dev: ^2.28.0
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "lib/assests/images/logo/logo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "lib/assests/images/logo/logo.png"
+  web:
+    generate: true
+    image_path: "lib/assests/images/logo/logo.png"
+    background_color: "#FFFFFF"
+    theme_color: "#1B5E20"
+  windows:
+    generate: true
+    image_path: "lib/assests/images/logo/logo.png"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "lib/assests/images/logo/logo.png"
 
 flutter:
   uses-material-design: true

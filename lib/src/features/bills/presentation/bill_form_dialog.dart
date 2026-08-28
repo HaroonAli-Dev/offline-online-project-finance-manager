@@ -126,8 +126,8 @@ class _BillFormDialogState extends State<BillFormDialog> {
     return AlertDialog(
       title: Text(title),
       scrollable: true,
-      content: SizedBox(
-        width: 480,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
         child: Form(
           key: _formKey,
           child: Column(
@@ -264,12 +264,13 @@ class _BillFormDialogState extends State<BillFormDialog> {
                 ),
                 maxLines: 3,
               ),
-              if (isEdit) ...[
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 8),
-                AttachmentsPanel(entityType: 'bill', entityId: widget.bill!.id),
-              ],
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 8),
+              if (isEdit)
+                AttachmentsPanel(entityType: 'bill', entityId: widget.bill!.id)
+              else
+                const _PendingBillAttachmentsNotice(),
             ],
           ),
         ),
@@ -284,6 +285,37 @@ class _BillFormDialogState extends State<BillFormDialog> {
           child: Text(isEdit ? 'Save Changes' : 'Add Bill'),
         ),
       ],
+    );
+  }
+}
+
+/// Avoids orphan files: an attachment needs the UUID created when the bill is
+/// saved. The creation workflow opens the same attachment experience next.
+class _PendingBillAttachmentsNotice extends StatelessWidget {
+  const _PendingBillAttachmentsNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.attach_file),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Attachments\nSave the bill first to add attachments.',
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

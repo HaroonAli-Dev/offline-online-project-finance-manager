@@ -5,6 +5,7 @@ import '../../../core/utils/async_value_extensions.dart';
 
 import '../../../core/widgets/hint_banner.dart';
 import '../../documents/presentation/entity_attachments_page.dart';
+import '../../documents/presentation/attachments_panel.dart';
 import '../../schemes/presentation/schemes_providers.dart';
 import '../data/bills_repository.dart';
 import '../domain/bill_model.dart';
@@ -136,7 +137,7 @@ Future<void> showBillForm(
 
   try {
     if (bill == null) {
-      await repository.createBill(
+      final createdBillId = await repository.createBill(
         schemeId: input.schemeId,
         billType: input.billType,
         billNumber: input.billNumber,
@@ -145,6 +146,12 @@ Future<void> showBillForm(
         status: input.status,
         remarks: input.remarks,
       );
+      if (context.mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => _BillAttachmentsDialog(billId: createdBillId),
+        );
+      }
     } else {
       await repository.updateBill(
         id: bill.id,
@@ -168,6 +175,32 @@ Future<void> showBillForm(
         const SnackBar(content: Text('Could not save bill. Please try again.')),
       );
     }
+  }
+}
+
+/// The second state of Add Bill: the bill now has a real local UUID, so the
+/// shared offline-first attachment pipeline can safely be used.
+class _BillAttachmentsDialog extends StatelessWidget {
+  const _BillAttachmentsDialog({required this.billId});
+
+  final String billId;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Photos/Documents'),
+      scrollable: true,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: AttachmentsPanel(entityType: 'bill', entityId: billId),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Done'),
+        ),
+      ],
+    );
   }
 }
 
