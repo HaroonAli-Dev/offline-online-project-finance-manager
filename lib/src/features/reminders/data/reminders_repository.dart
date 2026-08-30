@@ -87,8 +87,7 @@ class RemindersRepository {
   }
 
   Stream<List<ReminderModel>> watchRemindersForDate(DateTime date) {
-    final local = date.toLocal();
-    final start = DateTime(local.year, local.month, local.day).toUtc();
+    final start = DateTime.utc(date.year, date.month, date.day);
     return _watchDueQuery('r.due_at >= ? AND r.due_at < ?', [
       Variable.withDateTime(start),
       Variable.withDateTime(start.add(const Duration(days: 1))),

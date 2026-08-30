@@ -3,44 +3,41 @@
 
 **Project Name:** Finance & Construction Manager  
 **Project Type:** Offline-first finance and construction management system  
-**Primary Client:** Single client initially; architecture should remain scalable for future multi-organization use  
-**Last Updated:** August 28, 2026
+**Primary Client:** Single client initially; architecture remains scalable for future multi-organization use  
+**Last Updated:** August 30, 2026
 
 ---
 
 # 1. Project Vision
 
-Replace the client's paper-register process with a simple, reliable offline-first application for construction and financial record keeping.
+The app replaces paper-based project records with a reliable offline-first system for finance and construction tracking.
 
 Core features:
 
-- Record money received and money paid.
-- Track people, roles, engineers, staff, drivers, and labour.
-- Manage schemes and sites.
-- Record expenses and bills.
-- Track vehicles.
-- Maintain project progress.
-- Store photos, GPS data, and documents.
-- Create reminders and view dashboards.
-- Continue working without internet access.
-- Synchronize with the cloud when connectivity returns.
+- Record money received and money paid
+- Track people, roles, engineers, staff, drivers, and labour
+- Manage schemes and sites
+- Record expenses and bills
+- Track vehicles
+- Maintain project progress
+- Store photos, GPS data, and documents
+- Create reminders and view dashboards
+- Continue working without internet access
+- Synchronize with the cloud when connectivity returns
 
 ---
 
 # 2. Target Platforms
 
-## Phase 1
+## Current status
 
-- [ ] Android APK
 - [x] Windows desktop
-- [x] Flutter Web / PWA for iPhone Safari
+- [x] Flutter Web / PWA for Safari and browser-based deployment
+- [x] Android toolchain is configured and buildable in the local environment
+- [ ] Native iOS release package
+- [ ] Native macOS release package
 
-## Phase 2 / Future
-
-- [ ] Native iOS
-- [ ] Native macOS
-
-The initial iPhone solution is a web-based PWA, not a separate native iOS app. The app should work on Safari, be added to the home screen, and keep local data usable during temporary offline periods.
+> The web/PWA remains the primary mobile deployment route for iPhone Safari, while Android and Windows are the current desktop/native targets.
 
 ---
 
@@ -55,7 +52,7 @@ The initial iPhone solution is a web-based PWA, not a separate native iOS app. T
 - Supabase Storage
 - Flutter Web / PWA
 
-Supporting packages currently in use or planned:
+Supporting libraries in active use:
 
 - `file_picker`
 - `csv`
@@ -64,60 +61,39 @@ Supporting packages currently in use or planned:
 - `flutter_local_notifications`
 - `supabase_flutter`
 - `pdf`, `printing`
+- `connectivity_plus`
+- `timezone`
 
 ---
 
-# 4. Core Architecture
+# 4. Current Delivery Status
 
-The application is built as an offline-first system with the local database as the source of truth.
+## Completed and verified
 
-```text
-Flutter UI
-    ↓
-Riverpod
-    ↓
-Repositories / Services
-    ↓
-Drift / SQLite
-    ↓
-Local app data
-```
+- [x] Core Windows desktop app is working
+- [x] Offline-first local database and local source-of-truth design are in place
+- [x] People, Sites, Schemes, Transactions, Expenses, Vehicles, Dashboard, Bills, Progress, Attachments, and Reminders are implemented
+- [x] Reminder date/time query regression has been fixed and confirmed by tests
+- [x] Startup/bootstrap fix prevents web blank-screen startup from blocking the first frame
+- [x] Supabase config safely falls back to offline-only mode when credentials are missing
+- [x] Cross-platform document and local attachment handling is implemented
+- [x] Flutter analyzer is clean
+- [x] Targeted regression tests pass for reminders, auth, and Supabase config
+- [x] Web release build succeeds
 
-When internet is available, local changes can be synced to Supabase after the local model is stable.
+## Remaining work before production sign-off
 
-Core rule:
-
-- Supabase is not required for normal offline CRUD operations.
-
----
-
-# 5. Current Status
-
-## Completed
-
-- [x] Core Windows desktop app working
-- [x] People, Sites, Schemes, Transactions, Expenses, Vehicles, Dashboard, Bills, Progress, Attachments, and Reminders implemented
-- [x] Local SQLite/Drift database foundation
-- [x] Offline-first local source-of-truth design
-- [x] SQLite backup / restore
-- [x] Cross-platform document and file attachments
-- [x] Basic Flutter web / PWA support
-- [x] Architecture and database audit completed
-- [x] P0 and P1 critical fixes applied
-- [x] Automated tests passing for the current codebase
-
-## Remaining active work
-
-- [ ] Android validation and packaging (APK result still needs confirmed build output)
-- [x] Web/PWA offline validation
-- [ ] Supabase auth and sync design
-- [ ] Production security checks
+- [ ] Final Android packaging / APK verification for release distribution
+- [ ] Production Supabase auth and sync configuration hardening
+- [ ] Security review for cloud sync and storage endpoints
+- [ ] Browser-level smoke testing on real Chrome/Safari for app startup and session behavior
+- [ ] Final deployment checklist for production release
 
 ---
 
-# 6. Module Roadmap
+# 5. Module Status
 
-## Phase 1 — Foundation
+## Foundation
 
 Status: Complete
 
@@ -127,96 +103,54 @@ Status: Complete
 - [x] Feature-first structure
 - [x] Sync queue foundation
 
-## Phase 2 — People & Roles
+## Business module coverage
 
-Status: Complete for offline use
+- [x] People and roles
+- [x] Sites
+- [x] Schemes / projects
+- [x] Financial transactions
+- [x] Expenses
+- [x] Vehicles and drivers
+- [x] Bills
+- [x] Progress tracking
+- [x] Photos, GPS, and documents
+- [x] Reminders and calendar
+- [x] Dashboard and summaries
 
-- [x] Add, edit, search, soft-delete people
-- [x] Support normalized multi-role relationships
+## Stability and audit checks
 
-## Phase 3 — Sites
+Status: Complete for the local-first MVP
 
-Status: Complete
+- [x] Database and migration review
+- [x] Offline CRUD validation
+- [x] Reminder and attachment validation
+- [x] Startup and auth fallback validation
+- [x] Analyzer validation
+- [x] Relevant tests passing
 
-## Phase 4 — Schemes / Projects
+---
 
-Status: Complete
+# 6. Completion estimate
 
-## Phase 5 — Financial Transactions
+The project is functionally complete as a local-first MVP and release candidate for offline usage.
 
-Status: Complete
+The remaining work is not a feature rebuild; it is release hardening:
 
-## Phase 6 — Expenses
+- Android packaging verification
+- Real browser/device validation
+- Supabase production configuration and security review
+- Final production deployment sign-off
 
-Status: Complete
+Estimated completion window for a final production-ready release:
 
-## Phase 7 — Vehicles & Drivers
+- MVP / local-first release candidate: complete now
+- Production release with packaging and cloud integration: 1 to 3 weeks, depending on app store / deployment requirements and external credentials availability
 
-Status: Complete
+---
 
-## Phase 8 — Bills
+# 7. Known environment note
 
-Status: Complete
-
-## Phase 9 — Progress Tracking
-
-Status: Complete
-
-- [x] Progress repository and UI completed
-- [x] Migration and repository tests added
-- [x] Cross-platform validation completed for the module
-
-## Phase 10 — Photos, GPS & Documents
-
-Status: Complete
-
-- [x] Attachment metadata storage and validation
-- [x] GPS and image handling support
-- [x] Local attachment management and filtering
-
-## Phase 11 — Reminders & Calendar
-
-Status: Complete
-
-- [x] Reminder repository, filtering, and UI
-- [x] Calendar/date selection with offline selected-day filtering
-- [x] Normalized relationships for Schemes, Sites, Bills, Progress, and People
-- [x] Explicit repository queries, getById, restore, and deterministic ordering
-- [x] Optional due-time picker and time-aware persistence/overdue logic
-- [x] Local notification scheduling, cancellation, rescheduling, and deterministic IDs
-- [x] SyncOutbox integration for reminder lifecycle operations
-- [x] Repository, relationship, query, migration, and notification abstraction tests
-- [x] Non-destructive schema migration for reminder entity links
-
-Limitations:
-
-- Web/PWA skips `flutter_local_notifications` scheduling because browser background scheduling is not supported by the package; calendar and reminder CRUD remain fully available offline.
-- Native notification permission and platform manifest configuration remain platform-specific deployment work.
-- Supabase synchronization and authentication remain future phases.
-
-## Phase 12 — Dashboard
-
-Status: Complete and validated
-
-- [x] Summary cards and quick actions
-- [x] Upcoming reminders and budget utilization
-- [x] Responsive dashboard layout
-- [x] Local database/provider statistics validation
-- [x] Reminder due-date, due-time, completion, and soft-delete validation
-- [x] Loading, empty, error-safe, and offline behavior validation
-- [x] Narrow-width overflow validation and responsive card polish
-- [x] Dashboard widget tests for data, reminders, empty state, and phone layout
-
-## Pre-release Stabilization Audit
-
-Status: Complete for the local application
-
-- [x] Completed modules, repositories, providers, navigation, and shared services audited
-- [x] Drift schema, migration history, indexes, soft-delete behavior, and SyncOutbox verified
-- [x] Offline CRUD, relationship, validation, attachment, reminder, and Dashboard tests validated
-- [x] File/path safety and cross-platform conditional APIs reviewed
-- [x] Responsive UI and empty/loading/error-state behavior reviewed
-- [x] Full analyzer, test suite, and Windows release build integrity checks passed
+The repository itself is in a clean state for code and analyzer checks. The only active warning from Flutter Doctor is environmental: Chrome is not installed in the machine runtime, so browser-based web testing needs a local Chrome or Chromium install.
 
 Remaining before production release:
 

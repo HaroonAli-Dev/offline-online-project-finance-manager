@@ -33,6 +33,19 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local environment / generated platform files
+.fvm/
+.fvm/flutter_sdk
+android/local.properties
+ios/Flutter/Generated.xcconfig
+ios/Flutter/GeneratedPluginRegistrant.*
+macos/Flutter/Generated.xcconfig
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+web/*.js.deps
+web/*.js.map
+web/*.wasm
+
 # Symbolication related
 app.*.symbols
 

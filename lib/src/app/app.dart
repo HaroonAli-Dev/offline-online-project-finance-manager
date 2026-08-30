@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/providers/hint_preferences_provider.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/bills/presentation/bills_page.dart';
 import '../features/expenses/presentation/expenses_page.dart';
@@ -23,23 +25,26 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Finance & Construction Manager',
-      debugShowCheckedModeBanner: false,
-      theme: appTheme,
-      home: const MainNavigationShell(),
+    return ProviderScope(
+      child: MaterialApp(
+        title: 'Finance & Construction Manager',
+        debugShowCheckedModeBanner: false,
+        theme: appTheme,
+        home: const MainNavigationShell(),
+      ),
     );
   }
 }
 
-class MainNavigationShell extends StatefulWidget {
+class MainNavigationShell extends ConsumerStatefulWidget {
   const MainNavigationShell({super.key});
 
   @override
-  State<MainNavigationShell> createState() => _MainNavigationShellState();
+  ConsumerState<MainNavigationShell> createState() =>
+      _MainNavigationShellState();
 }
 
-class _MainNavigationShellState extends State<MainNavigationShell> {
+class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
   int _currentIndex = 0;
 
   static const _pages = <Widget>[
@@ -73,8 +78,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     child: IntrinsicHeight(
                       child: NavigationRail(
                         selectedIndex: _currentIndex,
-                        onDestinationSelected: (index) =>
-                            setState(() => _currentIndex = index),
+                        onDestinationSelected: (index) {
+                          setState(() => _currentIndex = index);
+                          ref.read(hintPreferencesProvider.notifier).clearAll();
+                        },
                         labelType: NavigationRailLabelType.all,
                         leading: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -154,7 +161,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           (1, Icons.people_outline, Icons.people, 'People'),
           (2, Icons.location_city_outlined, Icons.location_city, 'Sites'),
           (3, Icons.assignment_outlined, Icons.assignment, 'Schemes'),
-          (4, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Transactions'),
+          (
+            4,
+            Icons.account_balance_wallet_outlined,
+            Icons.account_balance_wallet,
+            'Transactions',
+          ),
         ];
         const row2Destinations = [
           (5, Icons.receipt_long_outlined, Icons.receipt_long, 'Expenses'),
@@ -164,7 +176,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           (9, Icons.notifications_outlined, Icons.notifications, 'Reminders'),
         ];
 
-        Widget buildNavigationRow(List<(int, IconData, IconData, String)> items) {
+        Widget buildNavigationRow(
+          List<(int, IconData, IconData, String)> items,
+        ) {
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: items.map((item) {
@@ -177,7 +191,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
               return Expanded(
                 child: InkWell(
-                  onTap: () => setState(() => _currentIndex = index),
+                  onTap: () {
+                    setState(() => _currentIndex = index);
+                    ref.read(hintPreferencesProvider.notifier).clearAll();
+                  },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Column(

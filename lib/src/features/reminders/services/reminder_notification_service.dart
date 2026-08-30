@@ -28,7 +28,7 @@ class ReminderNotificationService {
     if (kIsWeb || _initialized) return;
     tz.initializeTimeZones();
     final initialized = await _plugin.initialize(
-      settings: const InitializationSettings(
+      const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         iOS: DarwinInitializationSettings(),
         windows: WindowsInitializationSettings(
@@ -50,13 +50,13 @@ class ReminderNotificationService {
     try {
       await initialize();
       if (!_initialized) return;
-      await _plugin.cancel(id: notificationId(reminderId));
+      await _plugin.cancel(notificationId(reminderId));
       await _plugin.zonedSchedule(
-        id: notificationId(reminderId),
-        title: title,
-        body: 'Reminder due now',
-        scheduledDate: tz.TZDateTime.from(dueAt.toLocal(), tz.local),
-        notificationDetails: const NotificationDetails(
+        notificationId(reminderId),
+        title,
+        'Reminder due now',
+        tz.TZDateTime.from(dueAt.toLocal(), tz.local),
+        const NotificationDetails(
           android: AndroidNotificationDetails(
             'finance_reminders',
             'Finance reminders',
@@ -82,7 +82,7 @@ class ReminderNotificationService {
     try {
       await initialize();
       if (!_initialized) return;
-      await _plugin.cancel(id: notificationId(reminderId));
+      await _plugin.cancel(notificationId(reminderId));
     } catch (_) {
       // Notification delivery is optional and must not block local CRUD.
     }

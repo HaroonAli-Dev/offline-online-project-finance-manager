@@ -9,6 +9,8 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    - '**/*.g.dart'
+    - '**/*.freezed.dart'
   errors:
     # Treat these as errors, not warnings
     invalid_annotation_target: ignore # drift generates these

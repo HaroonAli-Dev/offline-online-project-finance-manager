@@ -1,5 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 
 Future<Uint8List?> readFileBytes(String? filePath) async {
   if (filePath == null || filePath.trim().isEmpty) return null;
@@ -8,7 +9,12 @@ Future<Uint8List?> readFileBytes(String? filePath) async {
     if (await file.exists()) {
       return await file.readAsBytes();
     }
-  } catch (_) {}
+  } catch (error, stackTrace) {
+    debugPrint('AttachmentFileHelper: failed to read attachment bytes: $error');
+    if (kDebugMode) {
+      debugPrint(stackTrace.toString());
+    }
+  }
   return null;
 }
 
@@ -17,6 +23,13 @@ Future<bool> fileExists(String? filePath) async {
   try {
     final file = File(filePath);
     return await file.exists();
-  } catch (_) {}
-  return false;
+  } catch (error, stackTrace) {
+    debugPrint(
+      'AttachmentFileHelper: failed to check attachment existence: $error',
+    );
+    if (kDebugMode) {
+      debugPrint(stackTrace.toString());
+    }
+    return false;
+  }
 }

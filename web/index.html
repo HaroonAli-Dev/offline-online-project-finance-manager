@@ -34,34 +34,15 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
   <script>
-    // Flutter no longer generates a service worker. Register the app-owned
-    // worker first so the initial Flutter assets and the web database runtime
-    // are cached for offline starts after the first successful visit.
-    (async function () {
+    window.addEventListener('load', () => {
       if ('serviceWorker' in navigator) {
-        try {
-          await navigator.serviceWorker.register('offline_service_worker.js');
-          await navigator.serviceWorker.ready;
-        } catch (error) {
-          // Continue online if the browser or server cannot use service workers.
+        navigator.serviceWorker.register('offline_service_worker.js').catch((error) => {
           console.warn('Offline cache could not be initialized.', error);
-        }
+        });
       }
-
-      const script = document.createElement('script');
-      script.src = 'flutter_bootstrap.js';
-      script.async = true;
-      document.body.appendChild(script);
-    })();
+    });
   </script>
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

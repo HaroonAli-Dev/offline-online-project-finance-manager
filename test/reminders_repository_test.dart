@@ -488,6 +488,28 @@ void main() {
     },
   );
 
+  test('watchRemindersForDate keeps UTC calendar-day boundaries', () async {
+    final dayStart = DateTime.utc(2026, 6, 1, 0, 0, 0);
+    final sameDayLater = DateTime.utc(2026, 6, 1, 23, 59, 59);
+    final nextDayStart = DateTime.utc(2026, 6, 2, 0, 0, 0);
+
+    await remindersRepository.createReminder(
+      title: 'UTC same-day reminder',
+      dueAt: sameDayLater,
+    );
+    await remindersRepository.createReminder(
+      title: 'UTC next-day reminder',
+      dueAt: nextDayStart,
+    );
+
+    final byDate = await remindersRepository
+        .watchRemindersForDate(dayStart)
+        .first;
+
+    expect(byDate.any((r) => r.title == 'UTC same-day reminder'), isTrue);
+    expect(byDate.any((r) => r.title == 'UTC next-day reminder'), isFalse);
+  });
+
   // --------------------------------------------------------------------------
   // 25. Relationship support for normalized entity links
   // --------------------------------------------------------------------------

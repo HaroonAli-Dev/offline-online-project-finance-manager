@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import '../core/config/supabase_config.dart';
@@ -6,8 +8,10 @@ import 'startup_app.dart';
 
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SupabaseConfig.initialize();
+
   final databaseFuture = _initializeDatabase();
+  unawaited(SupabaseConfig.initialize());
+
   runApp(StartupApp(databaseFuture: databaseFuture));
 }
 
