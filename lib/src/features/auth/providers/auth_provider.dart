@@ -15,8 +15,9 @@ final localSessionServiceProvider = Provider<LocalSessionService>((ref) {
 });
 
 /// Optional provider supplying pre-loaded session data from startup restoration gate.
-final initialRestoredSessionProvider =
-    Provider<LocalSessionData?>((ref) => null);
+final initialRestoredSessionProvider = Provider<LocalSessionData?>(
+  (ref) => null,
+);
 
 /// Immutable state representation of user authentication.
 class AppAuthState {
@@ -72,8 +73,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
     final subscription = authService.authStateChanges.listen((data) {
       // Only reset to unauthenticated on explicit sign out or account deletion.
       // Temporary network loss or offline refresh errors must not clear the user.
-      if (data.event == AuthChangeEvent.signedOut ||
-          data.event == AuthChangeEvent.userDeleted) {
+      if (data.event == AuthChangeEvent.signedOut) {
         state = const AppAuthState();
         return;
       }
@@ -156,10 +156,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
       );
       return true;
     } on AuthException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: () => e.message,
-      );
+      state = state.copyWith(isLoading: false, errorMessage: () => e.message);
       return false;
     } catch (e) {
       state = state.copyWith(
@@ -207,10 +204,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
       );
       return true;
     } on AuthException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: () => e.message,
-      );
+      state = state.copyWith(isLoading: false, errorMessage: () => e.message);
       return false;
     } catch (e) {
       state = state.copyWith(
@@ -221,18 +215,9 @@ class AuthNotifier extends Notifier<AppAuthState> {
     }
   }
 
-  /// Deprecated offline guest bypass.
-  @deprecated
-  void continueOffline() {
-    state = state.copyWith(
-      isOfflineBypass: true,
-      errorMessage: () => null,
-    );
-  }
-
   /// Sign out current user from this device.
   ///
-  /// Clears local session restoration state and calls [AuthService.signOut] with [SignOutScope.local].
+  /// Clears local session restoration state and signs out this device.
   Future<void> signOut() async {
     state = state.copyWith(isLoading: true, errorMessage: () => null);
     try {
@@ -272,4 +257,3 @@ final currentUserEmailProvider = Provider<String?>((ref) {
   }
   return authState.user?.email;
 });
-

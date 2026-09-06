@@ -38,10 +38,7 @@ class StartupApp extends StatelessWidget {
 }
 
 class _StartupResult {
-  const _StartupResult({
-    required this.database,
-    this.restoredSession,
-  });
+  const _StartupResult({required this.database, this.restoredSession});
 
   final AppDatabase database;
   final LocalSessionData? restoredSession;
@@ -62,7 +59,8 @@ class _StartupGate extends StatefulWidget {
   State<_StartupGate> createState() => _StartupGateState();
 }
 
-class _StartupGateState extends State<_StartupGate> with WidgetsBindingObserver {
+class _StartupGateState extends State<_StartupGate>
+    with WidgetsBindingObserver {
   late Future<_StartupResult> _startupFuture;
   late final LocalSessionService _sessionService;
 
@@ -86,7 +84,7 @@ class _StartupGateState extends State<_StartupGate> with WidgetsBindingObserver 
           _sessionService.clearSession();
           if (SupabaseConfig.isInitialized) {
             try {
-              SupabaseConfig.client.auth.signOut(scope: SignOutScope.local);
+              SupabaseConfig.client.auth.signOut();
             } catch (_) {}
           }
         }
@@ -116,7 +114,7 @@ class _StartupGateState extends State<_StartupGate> with WidgetsBindingObserver 
       await _sessionService.clearSession();
       if (SupabaseConfig.isInitialized) {
         try {
-          await SupabaseConfig.client.auth.signOut(scope: SignOutScope.local);
+          await SupabaseConfig.client.auth.signOut();
         } catch (_) {}
       }
       return _StartupResult(database: database, restoredSession: null);
@@ -147,7 +145,9 @@ class _StartupGateState extends State<_StartupGate> with WidgetsBindingObserver 
                   key: const ValueKey('application'),
                   overrides: [
                     appDatabaseProvider.overrideWithValue(result.database),
-                    localSessionServiceProvider.overrideWithValue(_sessionService),
+                    localSessionServiceProvider.overrideWithValue(
+                      _sessionService,
+                    ),
                     if (result.restoredSession != null)
                       initialRestoredSessionProvider.overrideWithValue(
                         result.restoredSession,

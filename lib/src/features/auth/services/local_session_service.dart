@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,12 +23,15 @@ class LocalSessionData {
     'createdAt': createdAt.toIso8601String(),
   };
 
-  factory LocalSessionData.fromJson(Map<String, dynamic> json) => LocalSessionData(
-    userId: json['userId'] as String,
-    email: json['email'] as String,
-    rememberMe: json['rememberMe'] as bool? ?? false,
-    createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
-  );
+  factory LocalSessionData.fromJson(Map<String, dynamic> json) =>
+      LocalSessionData(
+        userId: json['userId'] as String,
+        email: json['email'] as String,
+        rememberMe: json['rememberMe'] as bool? ?? false,
+        createdAt:
+            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+            DateTime.now(),
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -53,7 +55,7 @@ class LocalSessionData {
 /// Handles session persistence, Remember Me status, and restoration eligibility
 /// across application launches using [SharedPreferences].
 class LocalSessionService {
-  LocalSessionService({SharedPreferences? prefs}) : _prefs = prefs;
+  LocalSessionService({this._prefs});
 
   SharedPreferences? _prefs;
 
@@ -62,7 +64,8 @@ class LocalSessionService {
   static const String _kUserIdKey = 'app_auth_user_id';
   static const String _kEmailKey = 'app_auth_user_email';
   static const String _kRememberMeKey = 'app_auth_remember_me';
-  static const String _kRestorationEligibleKey = 'app_auth_restoration_eligible';
+  static const String _kRestorationEligibleKey =
+      'app_auth_restoration_eligible';
   static const String _kCreatedAtKey = 'app_auth_session_created_at';
 
   Future<SharedPreferences> _getPrefs() async {

@@ -42,7 +42,8 @@ class TestAuthService extends AuthService {
     if (shouldThrowOnSignIn) {
       throw const AuthException('Invalid login credentials');
     }
-    final user = userToReturn ??
+    final user =
+        userToReturn ??
         User(
           id: 'mock-user-id',
           appMetadata: const {},
@@ -62,7 +63,8 @@ class TestAuthService extends AuthService {
     if (shouldThrowOnSignUp) {
       throw const AuthException('User already registered');
     }
-    final user = userToReturn ??
+    final user =
+        userToReturn ??
         User(
           id: 'mock-user-id',
           appMetadata: const {},
@@ -80,20 +82,6 @@ class TestAuthService extends AuthService {
   }
 }
 
-User _createTestUser({
-  String id = 'user-123',
-  String email = 'user@example.com',
-}) {
-  return User(
-    id: id,
-    appMetadata: const {},
-    userMetadata: const {},
-    aud: 'authenticated',
-    createdAt: DateTime.now().toIso8601String(),
-    email: email,
-  );
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -104,9 +92,7 @@ void main() {
   group('AuthNotifier and AppAuthState Unit Tests', () {
     test('initial state without session is unauthenticated', () {
       final container = ProviderContainer(
-        overrides: [
-          authServiceProvider.overrideWithValue(TestAuthService()),
-        ],
+        overrides: [authServiceProvider.overrideWithValue(TestAuthService())],
       );
       addTearDown(container.dispose);
 
@@ -155,67 +141,73 @@ void main() {
       expect(isRemembered, isTrue);
     });
 
-    test('login with Remember Me DISABLED does NOT persist restoration state', () async {
-      final prefs = await SharedPreferences.getInstance();
-      final localSessionService = LocalSessionService(prefs: prefs);
-      final testService = TestAuthService();
+    test(
+      'login with Remember Me DISABLED does NOT persist restoration state',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        final localSessionService = LocalSessionService(prefs: prefs);
+        final testService = TestAuthService();
 
-      final container = ProviderContainer(
-        overrides: [
-          authServiceProvider.overrideWithValue(testService),
-          localSessionServiceProvider.overrideWithValue(localSessionService),
-        ],
-      );
-      addTearDown(container.dispose);
+        final container = ProviderContainer(
+          overrides: [
+            authServiceProvider.overrideWithValue(testService),
+            localSessionServiceProvider.overrideWithValue(localSessionService),
+          ],
+        );
+        addTearDown(container.dispose);
 
-      final notifier = container.read(authStateProvider.notifier);
-      final success = await notifier.signIn(
-        'bob@example.com',
-        'password123',
-        rememberMe: false,
-      );
+        final notifier = container.read(authStateProvider.notifier);
+        final success = await notifier.signIn(
+          'bob@example.com',
+          'password123',
+          rememberMe: false,
+        );
 
-      expect(success, isTrue);
-      final state = container.read(authStateProvider);
-      expect(state.isAuthenticated, isTrue);
-      expect(state.rememberMe, isFalse);
+        expect(success, isTrue);
+        final state = container.read(authStateProvider);
+        expect(state.isAuthenticated, isTrue);
+        expect(state.rememberMe, isFalse);
 
-      // Restoration session must be null because rememberMe was false
-      final restored = await localSessionService.loadRestorationSession();
-      expect(restored, isNull);
+        // Restoration session must be null because rememberMe was false
+        final restored = await localSessionService.loadRestorationSession();
+        expect(restored, isNull);
 
-      final isRemembered = await localSessionService.isRememberMeEnabled();
-      expect(isRemembered, isFalse);
-    });
+        final isRemembered = await localSessionService.isRememberMeEnabled();
+        expect(isRemembered, isFalse);
+      },
+    );
 
-    test('explicit signOut clears auth state and local restoration state', () async {
-      final prefs = await SharedPreferences.getInstance();
-      final localSessionService = LocalSessionService(prefs: prefs);
-      final testService = TestAuthService();
+    test(
+      'explicit signOut clears auth state and local restoration state',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        final localSessionService = LocalSessionService(prefs: prefs);
+        final testService = TestAuthService();
 
-      final container = ProviderContainer(
-        overrides: [
-          authServiceProvider.overrideWithValue(testService),
-          localSessionServiceProvider.overrideWithValue(localSessionService),
-        ],
-      );
-      addTearDown(container.dispose);
+        final container = ProviderContainer(
+          overrides: [
+            authServiceProvider.overrideWithValue(testService),
+            localSessionServiceProvider.overrideWithValue(localSessionService),
+          ],
+        );
+        addTearDown(container.dispose);
 
-      final notifier = container.read(authStateProvider.notifier);
-      await notifier.signIn('alice@example.com', 'secret', rememberMe: true);
-      expect(container.read(isAuthenticatedProvider), isTrue);
-      expect(await localSessionService.isRememberMeEnabled(), isTrue);
+        final notifier = container.read(authStateProvider.notifier);
+        await notifier.signIn('alice@example.com', 'secret', rememberMe: true);
+        expect(container.read(isAuthenticatedProvider), isTrue);
+        expect(await localSessionService.isRememberMeEnabled(), isTrue);
 
-      await notifier.signOut();
-      expect(container.read(isAuthenticatedProvider), isFalse);
-      expect(container.read(currentUserEmailProvider), isNull);
-      expect(testService.signedOutCalled, isTrue);
+        await notifier.signOut();
+        expect(container.read(isAuthenticatedProvider), isFalse);
+        expect(container.read(currentUserEmailProvider), isNull);
+        expect(testService.signedOutCalled, isTrue);
 
-      // Verify local storage is completely wiped
-      expect(await localSessionService.loadRestorationSession(), isNull);
-      expect(await localSessionService.getRawSession(), isNull);
-      expect(await localSessionService.isRememberMeEnabled(), isFalse);
-    });
+        // Verify local storage is completely wiped
+        expect(await localSessionService.loadRestorationSession(), isNull);
+        expect(await localSessionService.getRawSession(), isNull);
+        expect(await localSessionService.isRememberMeEnabled(), isFalse);
+      },
+    );
 
     test('offline startup initialization restores authenticated state without network dependency', () {
       final restoredData = LocalSessionData(
@@ -227,7 +219,9 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
-          authServiceProvider.overrideWithValue(TestAuthService()), // offline (null currentSession)
+          authServiceProvider.overrideWithValue(
+            TestAuthService(),
+          ), // offline (null currentSession)
           initialRestoredSessionProvider.overrideWithValue(restoredData),
         ],
       );
@@ -245,9 +239,7 @@ void main() {
 
     test('signIn/signUp fail with friendly message when Supabase is not configured', () async {
       final container = ProviderContainer(
-        overrides: [
-          authServiceProvider.overrideWithValue(const AuthService()),
-        ],
+        overrides: [authServiceProvider.overrideWithValue(const AuthService())],
       );
       addTearDown(container.dispose);
 
@@ -263,39 +255,36 @@ void main() {
   });
 
   group('LoginScreen Widget Tests', () {
-    testWidgets('renders login screen with Remember Me checkbox unchecked by default and no Continue Offline button', (tester) async {
+    testWidgets(
+      'renders login screen with Remember Me checkbox unchecked by default and no Continue Offline button',
+      (tester) async {
+        await tester.pumpWidget(
+          const ProviderScope(child: MaterialApp(home: LoginScreen())),
+        );
+
+        expect(find.text('Finance & Construction Manager'), findsOneWidget);
+        expect(find.text('Sign in to your account'), findsOneWidget);
+        expect(find.byType(TextFormField), findsNWidgets(2)); // email, password
+        expect(find.text('Sign In'), findsOneWidget);
+
+        // Verify Continue Offline button is REMOVED
+        expect(find.text('Continue Offline'), findsNothing);
+
+        // Verify Remember Me checkbox is PRESENT
+        expect(find.text('Remember Me'), findsOneWidget);
+        expect(find.byType(Checkbox), findsOneWidget);
+
+        // Checkbox must be UNCHECKED by default
+        final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
+        expect(checkbox.value, isFalse);
+      },
+    );
+
+    testWidgets('toggling Remember Me checkbox updates its checked state', (
+      tester,
+    ) async {
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: LoginScreen(),
-          ),
-        ),
-      );
-
-      expect(find.text('Finance & Construction Manager'), findsOneWidget);
-      expect(find.text('Sign in to your account'), findsOneWidget);
-      expect(find.byType(TextFormField), findsNWidgets(2)); // email, password
-      expect(find.text('Sign In'), findsOneWidget);
-
-      // Verify Continue Offline button is REMOVED
-      expect(find.text('Continue Offline'), findsNothing);
-
-      // Verify Remember Me checkbox is PRESENT
-      expect(find.text('Remember Me'), findsOneWidget);
-      expect(find.byType(Checkbox), findsOneWidget);
-
-      // Checkbox must be UNCHECKED by default
-      final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
-      expect(checkbox.value, isFalse);
-    });
-
-    testWidgets('toggling Remember Me checkbox updates its checked state', (tester) async {
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: LoginScreen(),
-          ),
-        ),
+        const ProviderScope(child: MaterialApp(home: LoginScreen())),
       );
 
       Checkbox checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
@@ -316,49 +305,46 @@ void main() {
       expect(checkbox.value, isFalse);
     });
 
-    testWidgets('switching between Sign In and Sign Up toggles confirm password field while preserving Remember Me', (tester) async {
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: LoginScreen(),
-          ),
-        ),
-      );
+    testWidgets(
+      'switching between Sign In and Sign Up toggles confirm password field while preserving Remember Me',
+      (tester) async {
+        await tester.pumpWidget(
+          const ProviderScope(child: MaterialApp(home: LoginScreen())),
+        );
 
-      // Initially Sign In mode (2 text fields)
-      expect(find.byType(TextFormField), findsNWidgets(2));
-      expect(find.text('Confirm Password'), findsNothing);
-      expect(find.text('Remember Me'), findsOneWidget);
+        // Initially Sign In mode (2 text fields)
+        expect(find.byType(TextFormField), findsNWidgets(2));
+        expect(find.text('Confirm Password'), findsNothing);
+        expect(find.text('Remember Me'), findsOneWidget);
 
-      // Tap Sign Up mode
-      final signUpButtonFinder = find.text("Don't have an account? Sign Up");
-      await tester.ensureVisible(signUpButtonFinder);
-      await tester.tap(signUpButtonFinder);
-      await tester.pumpAndSettle();
+        // Tap Sign Up mode
+        final signUpButtonFinder = find.text("Don't have an account? Sign Up");
+        await tester.ensureVisible(signUpButtonFinder);
+        await tester.tap(signUpButtonFinder);
+        await tester.pumpAndSettle();
 
-      // Sign Up mode (3 text fields)
-      expect(find.byType(TextFormField), findsNWidgets(3));
-      expect(find.text('Confirm Password'), findsOneWidget);
-      expect(find.text('Create Account'), findsOneWidget);
-      expect(find.text('Remember Me'), findsOneWidget);
+        // Sign Up mode (3 text fields)
+        expect(find.byType(TextFormField), findsNWidgets(3));
+        expect(find.text('Confirm Password'), findsOneWidget);
+        expect(find.text('Create Account'), findsOneWidget);
+        expect(find.text('Remember Me'), findsOneWidget);
 
-      // Tap back to Sign In mode
-      final signInButtonFinder = find.text('Already have an account? Sign In');
-      await tester.ensureVisible(signInButtonFinder);
-      await tester.tap(signInButtonFinder);
-      await tester.pumpAndSettle();
+        // Tap back to Sign In mode
+        final signInButtonFinder = find.text(
+          'Already have an account? Sign In',
+        );
+        await tester.ensureVisible(signInButtonFinder);
+        await tester.tap(signInButtonFinder);
+        await tester.pumpAndSettle();
 
-      expect(find.byType(TextFormField), findsNWidgets(2));
-      expect(find.text('Confirm Password'), findsNothing);
-    });
+        expect(find.byType(TextFormField), findsNWidgets(2));
+        expect(find.text('Confirm Password'), findsNothing);
+      },
+    );
 
     testWidgets('validation error displays on empty submit', (tester) async {
       await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: LoginScreen(),
-          ),
-        ),
+        const ProviderScope(child: MaterialApp(home: LoginScreen())),
       );
 
       await tester.tap(find.text('Sign In'));
@@ -370,81 +356,88 @@ void main() {
   });
 
   group('Startup Gate Auth Routing & Multi-Device Safety Tests', () {
-    testWidgets('shows LoginScreen when unauthenticated and database is ready', (tester) async {
-      final database = AppDatabase(NativeDatabase.memory());
-      addTearDown(database.close);
+    testWidgets(
+      'shows LoginScreen when unauthenticated and database is ready',
+      (tester) async {
+        final database = AppDatabase(NativeDatabase.memory());
+        addTearDown(database.close);
 
-      await tester.pumpWidget(
-        StartupApp(
-          databaseFuture: Future.value(database),
-        ),
-      );
+        await tester.pumpWidget(
+          StartupApp(databaseFuture: Future.value(database)),
+        );
 
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 800));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 800));
 
-      expect(find.byType(LoginScreen), findsOneWidget);
-      expect(find.text('Sign In'), findsOneWidget);
-    });
+        expect(find.byType(LoginScreen), findsOneWidget);
+        expect(find.text('Sign In'), findsOneWidget);
+      },
+    );
 
-    testWidgets('offline startup with Remember Me enabled opens authenticated app directly without LoginScreen', (tester) async {
-      final database = AppDatabase(NativeDatabase.memory());
-      addTearDown(database.close);
+    testWidgets(
+      'offline startup with Remember Me enabled opens authenticated app directly without LoginScreen',
+      (tester) async {
+        final database = AppDatabase(NativeDatabase.memory());
+        addTearDown(database.close);
 
-      final prefs = await SharedPreferences.getInstance();
-      final localSessionService = LocalSessionService(prefs: prefs);
-      await localSessionService.saveSession(
-        userId: 'field-worker-101',
-        email: 'worker@rural-site.org',
-        rememberMe: true,
-      );
+        final prefs = await SharedPreferences.getInstance();
+        final localSessionService = LocalSessionService(prefs: prefs);
+        await localSessionService.saveSession(
+          userId: 'field-worker-101',
+          email: 'worker@rural-site.org',
+          rememberMe: true,
+        );
 
-      await tester.pumpWidget(
-        StartupApp(
-          databaseFuture: Future.value(database),
-          localSessionService: localSessionService,
-        ),
-      );
+        await tester.pumpWidget(
+          StartupApp(
+            databaseFuture: Future.value(database),
+            localSessionService: localSessionService,
+          ),
+        );
 
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 800));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 800));
 
-      // Login screen must NOT appear
-      expect(find.byType(LoginScreen), findsNothing);
-      // Main navigation shell must be active
-      expect(find.byType(MainNavigationShell), findsOneWidget);
-    });
+        // Login screen must NOT appear
+        expect(find.byType(LoginScreen), findsNothing);
+        // Main navigation shell must be active
+        expect(find.byType(MainNavigationShell), findsOneWidget);
+      },
+    );
 
-    testWidgets('startup with Remember Me DISABLED clears session and shows LoginScreen', (tester) async {
-      final database = AppDatabase(NativeDatabase.memory());
-      addTearDown(database.close);
+    testWidgets(
+      'startup with Remember Me DISABLED clears session and shows LoginScreen',
+      (tester) async {
+        final database = AppDatabase(NativeDatabase.memory());
+        addTearDown(database.close);
 
-      final prefs = await SharedPreferences.getInstance();
-      final localSessionService = LocalSessionService(prefs: prefs);
-      await localSessionService.saveSession(
-        userId: 'temporary-user-202',
-        email: 'temp@site.org',
-        rememberMe: false, // Unchecked
-      );
+        final prefs = await SharedPreferences.getInstance();
+        final localSessionService = LocalSessionService(prefs: prefs);
+        await localSessionService.saveSession(
+          userId: 'temporary-user-202',
+          email: 'temp@site.org',
+          rememberMe: false, // Unchecked
+        );
 
-      await tester.pumpWidget(
-        StartupApp(
-          databaseFuture: Future.value(database),
-          localSessionService: localSessionService,
-        ),
-      );
+        await tester.pumpWidget(
+          StartupApp(
+            databaseFuture: Future.value(database),
+            localSessionService: localSessionService,
+          ),
+        );
 
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 800));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 800));
 
-      // Login screen must appear
-      expect(find.byType(LoginScreen), findsOneWidget);
-      expect(find.byType(MainNavigationShell), findsNothing);
+        // Login screen must appear
+        expect(find.byType(LoginScreen), findsOneWidget);
+        expect(find.byType(MainNavigationShell), findsNothing);
 
-      // Session must have been cleared
-      final raw = await localSessionService.getRawSession();
-      expect(raw, isNull);
-    });
+        // Session must have been cleared
+        final raw = await localSessionService.getRawSession();
+        expect(raw, isNull);
+      },
+    );
 
     test('multi-device independence: signing out one device does not trigger global revocation', () async {
       final testService = TestAuthService();
