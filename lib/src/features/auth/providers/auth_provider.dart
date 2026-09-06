@@ -2,11 +2,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/auth_service.dart';
+import '../services/local_session_service.dart';
 
 /// Provider exposing the [AuthService] singleton.
 final authServiceProvider = Provider<AuthService>((ref) {
   return const AuthService();
 });
+
+/// Provider exposing the [LocalSessionService] singleton.
+final localSessionServiceProvider = Provider<LocalSessionService>((ref) {
+  return LocalSessionService.instance;
+});
+
+/// Optional provider supplying pre-loaded session data from startup restoration gate.
+final initialRestoredSessionProvider =
+    Provider<LocalSessionData?>((ref) => null);
 
 /// Immutable state representation of user authentication.
 class AppAuthState {
@@ -16,6 +26,8 @@ class AppAuthState {
     this.isLoading = false,
     this.errorMessage,
     this.isOfflineBypass = false,
+    this.rememberMe = false,
+    this.isRestoredOffline = false,
   });
 
   final Session? session;
@@ -23,6 +35,8 @@ class AppAuthState {
   final bool isLoading;
   final String? errorMessage;
   final bool isOfflineBypass;
+  final bool rememberMe;
+  final bool isRestoredOffline;
 
   bool get isAuthenticated => user != null || isOfflineBypass;
 
@@ -32,6 +46,8 @@ class AppAuthState {
     bool? isLoading,
     String? Function()? errorMessage,
     bool? isOfflineBypass,
+    bool? rememberMe,
+    bool? isRestoredOffline,
   }) {
     return AppAuthState(
       session: session != null ? session() : this.session,
@@ -39,6 +55,8 @@ class AppAuthState {
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
       isOfflineBypass: isOfflineBypass ?? this.isOfflineBypass,
+      rememberMe: rememberMe ?? this.rememberMe,
+      isRestoredOffline: isRestoredOffline ?? this.isRestoredOffline,
     );
   }
 }
@@ -48,28 +66,67 @@ class AuthNotifier extends Notifier<AppAuthState> {
   @override
   AppAuthState build() {
     final authService = ref.watch(authServiceProvider);
+    final initialRestored = ref.watch(initialRestoredSessionProvider);
 
     // Subscribe to Supabase auth state change events if active.
     final subscription = authService.authStateChanges.listen((data) {
-      state = state.copyWith(
-        session: () => data.session,
-        user: () => data.session?.user,
-        isLoading: false,
-        errorMessage: () => null,
-      );
+      // Only reset to unauthenticated on explicit sign out or account deletion.
+      // Temporary network loss or offline refresh errors must not clear the user.
+      if (data.event == AuthChangeEvent.signedOut ||
+          data.event == AuthChangeEvent.userDeleted) {
+        state = const AppAuthState();
+        return;
+      }
+
+      if (data.session != null) {
+        state = state.copyWith(
+          session: () => data.session,
+          user: () => data.session?.user,
+          isLoading: false,
+          errorMessage: () => null,
+        );
+      }
     });
 
     ref.onDispose(subscription.cancel);
 
-    // Initial state: restore session if available
-    return AppAuthState(
-      session: authService.currentSession,
-      user: authService.currentUser,
-    );
+    // If an online Supabase session is already present, use it.
+    if (authService.currentUser != null) {
+      return AppAuthState(
+        session: authService.currentSession,
+        user: authService.currentUser,
+      );
+    }
+
+    // If an authenticated session with Remember Me was restored at startup, initialize with it.
+    if (initialRestored != null && initialRestored.rememberMe) {
+      return AppAuthState(
+        user: User(
+          id: initialRestored.userId,
+          appMetadata: const {},
+          userMetadata: const {},
+          aud: 'authenticated',
+          createdAt: initialRestored.createdAt.toIso8601String(),
+          email: initialRestored.email,
+        ),
+        rememberMe: true,
+        isRestoredOffline: true,
+      );
+    }
+
+    // Default initial unauthenticated state.
+    return const AppAuthState();
   }
 
   /// Sign in with email and password.
-  Future<bool> signIn(String email, String password) async {
+  ///
+  /// When [rememberMe] is true, the session is saved as restoration eligible across restarts.
+  /// When [rememberMe] is false, the session is marked for current application session only.
+  Future<bool> signIn(
+    String email,
+    String password, {
+    bool rememberMe = false,
+  }) async {
     state = state.copyWith(isLoading: true, errorMessage: () => null);
     try {
       final authService = ref.read(authServiceProvider);
@@ -77,12 +134,25 @@ class AuthNotifier extends Notifier<AppAuthState> {
         email: email,
         password: password,
       );
+
+      final user = response.user ?? response.session?.user;
+      if (user != null) {
+        final localSessionService = ref.read(localSessionServiceProvider);
+        await localSessionService.saveSession(
+          userId: user.id,
+          email: user.email ?? email.trim(),
+          rememberMe: rememberMe,
+        );
+      }
+
       state = state.copyWith(
         session: () => response.session,
-        user: () => response.user ?? response.session?.user,
+        user: () => user,
         isLoading: false,
         errorMessage: () => null,
         isOfflineBypass: false,
+        rememberMe: rememberMe,
+        isRestoredOffline: false,
       );
       return true;
     } on AuthException catch (e) {
@@ -101,7 +171,13 @@ class AuthNotifier extends Notifier<AppAuthState> {
   }
 
   /// Sign up with email and password.
-  Future<bool> signUp(String email, String password) async {
+  ///
+  /// When [rememberMe] is true, the session is saved as restoration eligible across restarts.
+  Future<bool> signUp(
+    String email,
+    String password, {
+    bool rememberMe = false,
+  }) async {
     state = state.copyWith(isLoading: true, errorMessage: () => null);
     try {
       final authService = ref.read(authServiceProvider);
@@ -109,12 +185,25 @@ class AuthNotifier extends Notifier<AppAuthState> {
         email: email,
         password: password,
       );
+
+      final user = response.user ?? response.session?.user;
+      if (user != null) {
+        final localSessionService = ref.read(localSessionServiceProvider);
+        await localSessionService.saveSession(
+          userId: user.id,
+          email: user.email ?? email.trim(),
+          rememberMe: rememberMe,
+        );
+      }
+
       state = state.copyWith(
         session: () => response.session,
-        user: () => response.user ?? response.session?.user,
+        user: () => user,
         isLoading: false,
         errorMessage: () => null,
         isOfflineBypass: false,
+        rememberMe: rememberMe,
+        isRestoredOffline: false,
       );
       return true;
     } on AuthException catch (e) {
@@ -132,7 +221,8 @@ class AuthNotifier extends Notifier<AppAuthState> {
     }
   }
 
-  /// Enter offline guest mode when Supabase credentials or network are not available.
+  /// Deprecated offline guest bypass.
+  @deprecated
   void continueOffline() {
     state = state.copyWith(
       isOfflineBypass: true,
@@ -140,10 +230,14 @@ class AuthNotifier extends Notifier<AppAuthState> {
     );
   }
 
-  /// Sign out current user.
+  /// Sign out current user from this device.
+  ///
+  /// Clears local session restoration state and calls [AuthService.signOut] with [SignOutScope.local].
   Future<void> signOut() async {
     state = state.copyWith(isLoading: true, errorMessage: () => null);
     try {
+      final localSessionService = ref.read(localSessionServiceProvider);
+      await localSessionService.clearSession();
       final authService = ref.read(authServiceProvider);
       await authService.signOut();
       state = const AppAuthState();
@@ -178,3 +272,4 @@ final currentUserEmailProvider = Provider<String?>((ref) {
   }
   return authState.user?.email;
 });
+

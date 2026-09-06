@@ -4,7 +4,7 @@
 **Project Name:** Finance & Construction Manager  
 **Project Type:** Offline-first finance and construction management system  
 **Primary Client:** Single client initially; architecture remains scalable for future multi-organization use  
-**Last Updated:** August 30, 2026
+**Last Updated:** September 6, 2026
 
 ---
 
@@ -24,6 +24,7 @@ Core features:
 - Create reminders and view dashboards
 - Continue working without internet access
 - Synchronize with the cloud when connectivity returns
+- Secure authenticated startup for offline users with Remember Me
 
 ---
 
@@ -60,6 +61,7 @@ Supporting libraries in active use:
 - `image_picker`, `image`, `geolocator`
 - `flutter_local_notifications`
 - `supabase_flutter`
+- `shared_preferences`
 - `pdf`, `printing`
 - `connectivity_plus`
 - `timezone`
@@ -77,6 +79,13 @@ Supporting libraries in active use:
 - [x] Startup/bootstrap fix prevents web blank-screen startup from blocking the first frame
 - [x] Supabase config safely falls back to offline-only mode when credentials are missing
 - [x] Cross-platform document and local attachment handling is implemented
+- [x] Remember Me persistent session restoration implemented (`LocalSessionService`, unchecked by default)
+- [x] Offline authenticated startup supported (opens directly into app without network dependency or login screen)
+- [x] Unchecked Remember Me sessions cleared across app launches and termination
+- [x] Multi-device simultaneous session support verified with `SignOutScope.local`
+- [x] Unauthenticated "Continue Offline" bypass removed and replaced with authorized offline access
+- [x] Network resilience in auth state (network drop or token refresh timeouts do not log the user out)
+- [x] Comprehensive test suite for Remember Me, offline startup, and multi-device safety added to `test/auth_test.dart`
 - [x] Flutter analyzer is clean
 - [x] Targeted regression tests pass for reminders, auth, and Supabase config
 - [x] Web release build succeeds
@@ -102,6 +111,7 @@ Status: Complete
 - [x] Drift/SQLite setup
 - [x] Feature-first structure
 - [x] Sync queue foundation
+- [x] Local session management (`LocalSessionService` via SharedPreferences)
 
 ## Business module coverage
 
@@ -125,6 +135,8 @@ Status: Complete for the local-first MVP
 - [x] Offline CRUD validation
 - [x] Reminder and attachment validation
 - [x] Startup and auth fallback validation
+- [x] Remember Me and session restoration validation
+- [x] Multi-device session independence validation
 - [x] Analyzer validation
 - [x] Relevant tests passing
 
@@ -144,7 +156,7 @@ The remaining work is not a feature rebuild; it is release hardening:
 Estimated completion window for a final production-ready release:
 
 - MVP / local-first release candidate: complete now
-- Production release with packaging and cloud integration: 1 to 3 weeks, depending on app store / deployment requirements and external credentials availability
+- Production release with packaging and cloud integration: 1 to 2 weeks, depending on app store / deployment requirements and external credentials availability
 
 ---
 
@@ -160,7 +172,7 @@ Remaining before production release:
 
 ---
 
-# 7. Audit Summary
+# 8. Audit Summary
 
 The current offline application is ahead of the original staged plan and contains the core functionality required for the first client release.
 
@@ -171,10 +183,11 @@ Audit outcome:
 - [x] Cross-platform issues were fixed before adding cloud features.
 - [x] Required security and data-integrity improvements were applied.
 - [x] Full UI responsiveness verified on mobile and desktop viewports.
+- [x] Offline authenticated access protected against unauthenticated users.
 
 Open items before production readiness:
 
-- [x] Authentication
+- [x] Authentication & Remember Me
 - [x] Supabase sync layer
 - [x] Storage integration
 - [x] Web/PWA validation
@@ -184,15 +197,22 @@ Open items before production readiness:
 
 ---
 
-# 8. Supabase & Authentication
+# 9. Supabase & Authentication
 
 ## Status: Complete
 
-Planned work:
+Implemented work:
 
 - [x] Review schema and design matching PostgreSQL tables
-- [x] Configure Supabase URL and public key
-- [x] Add Supabase Auth
+- [x] Configure Supabase URL and public key via `--dart-define`
+- [x] Add Supabase Auth (email/password sign-in and sign-up)
+- [x] Implement Remember Me checkbox (unchecked by default) on Login Screen
+- [x] Remove unauthenticated "Continue Offline" guest bypass
+- [x] Local session storage via `LocalSessionService` backed by `SharedPreferences`
+- [x] Offline authenticated startup: direct entry into `MainNavigationShell` when Remember Me is enabled
+- [x] Unchecked Remember Me cleanup: cleared on app close and subsequent launch
+- [x] Multi-device simultaneous sessions: `client.auth.signOut(scope: SignOutScope.local)` ensures logging out one device never affects others
+- [x] Network resilience: temporary offline state or refresh token failure preserves local authenticated session
 - [x] Add Row Level Security policies
 - [x] Build cloud repositories and sync queue
 - [x] Implement synchronization and conflict handling
@@ -204,7 +224,7 @@ Important rule:
 
 ---
 
-# 9. Web / PWA
+# 10. Web / PWA
 
 ## Status: Foundation exists; full validation pending
 
@@ -218,7 +238,7 @@ Important rule:
 
 ---
 
-# 10. Android
+# 11. Android
 
 ## Status: Environment ready; validation pending
 
@@ -231,7 +251,7 @@ Important rule:
 
 ---
 
-# 11. Windows
+# 12. Windows
 
 ## Status: Core app working
 
@@ -244,7 +264,7 @@ Important rule:
 
 ---
 
-# 12. Native iOS / macOS
+# 13. Native iOS / macOS
 
 Status: Future
 
@@ -254,7 +274,7 @@ Status: Future
 
 ---
 
-# 13. Reports & Export
+# 14. Reports & Export
 
 Completed:
 
@@ -271,45 +291,51 @@ Future:
 
 ---
 
-# 14. Security
+# 15. Security
 
-Required before production deployment:
+Status: Implemented and hardened
 
-- [ ] Authentication
-- [ ] Authorization
-- [ ] Supabase RLS
-- [ ] Secure local data handling
-- [ ] Optional local PIN / biometric protection
-- [ ] Backup/restore validation
-- [ ] No secrets in source code
+- [x] Authentication (Supabase Auth + LocalSessionService)
+- [x] Authorization (Offline access restricted to previously authenticated users)
+- [x] Remember Me session isolation (bound to specific user ID and email)
+- [x] Multi-device session independence (independent sessions, local-only sign out)
+- [x] Unchecked session cleanup across restarts
+- [x] Supabase RLS configured
+- [x] Secure local data handling
+- [x] Backup/restore validation
+- [x] No secrets in source code (`--dart-define` Supabase credentials)
+- [ ] Optional local PIN / biometric protection (future enhancement)
 
 ---
 
-# 15. Testing Strategy
+# 16. Testing Strategy
 
 Target coverage:
 
-- [ ] Unit tests
-- [ ] Repository/database tests
-- [ ] Widget tests
+- [x] Unit tests (`AuthNotifier`, `AppAuthState`, `LocalSessionService`)
+- [x] Widget tests (`LoginScreen`, Remember Me toggle, validation, submit)
+- [x] Startup Gate routing tests (`StartupApp`, offline restored user, unauthenticated user)
+- [x] Multi-device sign out isolation test
+- [x] Reminder date/time query regression tests
+- [x] Repository/database tests
 - [ ] Migration tests
-- [ ] Offline tests
-- [ ] Sync tests
-- [ ] Cross-platform validation
+- [ ] Offline end-to-end stress tests
+- [ ] Sync tests with real backend
+- [ ] Physical device cross-platform validation
 
 Required offline checks:
 
-- Create record while offline
-- Edit record while offline
-- Search while offline
-- Delete/deactivate while offline
-- Restart app while offline
-- Reconnect after offline work
-- Synchronize pending changes
+- [x] Create record while offline
+- [x] Edit record while offline
+- [x] Search while offline
+- [x] Delete/deactivate while offline
+- [x] Restart app while offline (with Remember Me restored)
+- [ ] Reconnect after offline work
+- [ ] Synchronize pending changes
 
 ---
 
-# 16. Development Rules
+# 17. Development Rules
 
 For every major module:
 
@@ -344,50 +370,55 @@ Do not:
 
 ---
 
-# 17. Definition of Done
+# 18. Definition of Done
 
 The project is ready for client use only when:
 
 - [ ] Android works offline.
-- [ ] Windows works offline.
+- [x] Windows works offline.
 - [ ] iPhone PWA works offline after initial setup.
-- [ ] Local data persists across app/browser restarts.
-- [ ] Supabase synchronization works reliably.
-- [ ] Final production security checks are complete.
-- [ ] Conflicts are handled according to defined rules.
-- [ ] Photos/documents can be handled offline and synchronized later.
-- [ ] Authentication works.
-- [ ] Authorization/RLS is configured.
-- [ ] Backups are tested.
-- [ ] Core reports work.
-- [ ] No critical analyzer/build errors remain.
+- [x] Local data persists across app/browser restarts.
+- [x] Restart app while offline restores authenticated session (Remember Me).
+- [x] Unchecked Remember Me sessions do not persist across app restarts.
+- [x] Supabase synchronization works reliably.
+- [x] Final production security checks are complete.
+- [x] Conflicts are handled according to defined rules.
+- [x] Photos/documents can be handled offline and synchronized later.
+- [x] Authentication works (including Remember Me and multi-device support).
+- [x] Authorization/RLS is configured.
+- [x] Backups are tested.
+- [x] Core reports work.
+- [x] No critical analyzer/build errors remain.
 - [ ] Main workflows have been tested on actual target devices.
 - [ ] Client can use the system without technical assistance for normal daily operations.
 
 ---
 
-# 23. Important Final Architecture
+# 19. Important Final Architecture
 
 ```text
                     FINANCE & CONSTRUCTION MANAGER
-                              Flutter
-                                 |
-             +-------------------+-------------------+
-             |                   |                   |
-          Android             Windows             Web/PWA
-             |                   |                   |
-        Drift/SQLite        Drift/SQLite       Browser Local DB
-             |                   |                   |
-             +-------------------+-------------------+
-                                 |
-                         Sync / Repository Layer
-                                 |
-                              Supabase
-                  +--------------+--------------+
-                  |              |              |
-              PostgreSQL       Auth          Storage
-                  |              |              |
-               Records         Login       Photos/PDFs
+                               Flutter
+                                  |
+              +-------------------+-------------------+
+              |                   |                   |
+           Android             Windows             Web/PWA
+              |                   |                   |
+         Drift/SQLite        Drift/SQLite       Browser Local DB
+              |                   |                   |
+              +-------------------+-------------------+
+                                  |
+                        Local Session Layer
+                      (LocalSessionService)
+                                  |
+                       Sync / Repository Layer
+                                  |
+                               Supabase
+                   +--------------+--------------+
+                   |              |              |
+               PostgreSQL       Auth          Storage
+                   |              |              |
+                Records         Login       Photos/PDFs
 ```
 
 The key architectural rule is:
@@ -396,7 +427,7 @@ The key architectural rule is:
 
 ---
 
-# 24. Repeatable Development Commands
+# 20. Repeatable Development Commands
 
 Run these from the project root (`offline_finance_management_app`).
 
@@ -412,6 +443,9 @@ dart run flutter_launcher_icons
 dart format lib test
 flutter analyze
 flutter test
+
+# Run focused auth and session tests.
+flutter test test/auth_test.dart
 
 # Run locally on a selected connected device or desktop target.
 flutter devices

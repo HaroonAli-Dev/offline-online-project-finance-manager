@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Finance App (Windows)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "windows",
+      "toolArgs": [
+        "--dart-define",
+        "SUPABASE_URL=https://iojxkzbmssqxyewjvqdx.supabase.co",
+        "--dart-define",
+        "SUPABASE_PUBLISHABLE_KEY=sb_publishable_qdox5r3Unqq5b00SF8YifQ_o2sgpESW"
+      ]
+    },
+    {
+      "name": "Finance App (Chrome Web)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--dart-define",
+        "SUPABASE_URL=https://iojxkzbmssqxyewjvqdx.supabase.co",
+        "--dart-define",
+        "SUPABASE_PUBLISHABLE_KEY=sb_publishable_qdox5r3Unqq5b00SF8YifQ_o2sgpESW"
+      ]
+    },
+    {
+      "name": "Finance App (Android)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "android",
+      "toolArgs": [
+        "--dart-define",
+        "SUPABASE_URL=https://iojxkzbmssqxyewjvqdx.supabase.co",
+        "--dart-define",
+        "SUPABASE_PUBLISHABLE_KEY=sb_publishable_qdox5r3Unqq5b00SF8YifQ_o2sgpESW"
+      ]
+    }
+  ]
+}

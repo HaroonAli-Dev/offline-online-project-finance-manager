@@ -21,6 +21,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isSignUp = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -46,9 +47,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final authNotifier = ref.read(authStateProvider.notifier);
     if (_isSignUp) {
-      await authNotifier.signUp(email, password);
+      await authNotifier.signUp(email, password, rememberMe: _rememberMe);
     } else {
-      await authNotifier.signIn(email, password);
+      await authNotifier.signIn(email, password, rememberMe: _rememberMe);
     }
   }
 
@@ -274,6 +275,53 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(height: 20),
                       ],
 
+                      // Remember Me Checkbox
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: InkWell(
+                          onTap: authState.isLoading
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _rememberMe = !_rememberMe;
+                                  });
+                                },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: Checkbox(
+                                    value: _rememberMe,
+                                    onChanged: authState.isLoading
+                                        ? null
+                                        : (val) {
+                                            setState(() {
+                                              _rememberMe = val ?? false;
+                                            });
+                                          },
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Remember Me',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurface,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
                       // Submit Button
                       FilledButton(
                         onPressed: authState.isLoading ? null : _submit,
@@ -309,26 +357,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           _isSignUp
                               ? 'Already have an account? Sign In'
                               : 'Don\'t have an account? Sign Up',
-                        ),
-                      ),
-
-                      // Continue Offline Button
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.offline_bolt_outlined, size: 18),
-                        label: const Text('Continue Offline'),
-                        onPressed: authState.isLoading
-                            ? null
-                            : () {
-                                ref
-                                    .read(authStateProvider.notifier)
-                                    .continueOffline();
-                              },
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
                         ),
                       ),
                     ],

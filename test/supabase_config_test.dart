@@ -3,10 +3,16 @@ import 'package:offline_finance_management_app/src/core/config/supabase_config.d
 
 void main() {
   group('SupabaseConfig', () {
-    test('reports unconfigured when environment variables are empty', () {
-      expect(SupabaseConfig.supabaseUrl, isEmpty);
-      expect(SupabaseConfig.supabaseAnonKey, isEmpty);
-      expect(SupabaseConfig.isConfigured, isFalse);
+    test('reports configured with project credentials by default', () {
+      expect(
+        SupabaseConfig.supabaseUrl,
+        'https://iojxkzbmssqxyewjvqdx.supabase.co',
+      );
+      expect(
+        SupabaseConfig.supabaseAnonKey,
+        'sb_publishable_qdox5r3Unqq5b00SF8YifQ_o2sgpESW',
+      );
+      expect(SupabaseConfig.isConfigured, isTrue);
       expect(SupabaseConfig.isInitialized, isFalse);
     });
 

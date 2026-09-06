@@ -81,13 +81,15 @@ class AuthService {
     }
   }
 
-  /// Signs out the current authenticated user.
+  /// Signs out the current authenticated user on this device.
+  ///
+  /// Uses [SignOutScope.local] to ensure other devices remain authenticated.
   Future<void> signOut() async {
     final client = _client;
     if (client == null) return;
 
     try {
-      await client.auth.signOut();
+      await client.auth.signOut(scope: SignOutScope.local);
     } on AuthException {
       rethrow;
     } catch (e) {

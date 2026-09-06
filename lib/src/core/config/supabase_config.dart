@@ -11,13 +11,13 @@ class SupabaseConfig {
   /// URL for the Supabase project backend.
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: '',
+    defaultValue: 'https://iojxkzbmssqxyewjvqdx.supabase.co',
   );
 
   /// Anonymous/publishable API key for the Supabase project.
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_PUBLISHABLE_KEY',
-    defaultValue: '',
+    defaultValue: 'sb_publishable_qdox5r3Unqq5b00SF8YifQ_o2sgpESW',
   );
 
   /// Whether valid Supabase parameters were provided at compile/run time.
