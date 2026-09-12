@@ -1,4 +1,5 @@
 {
     "cmake.sourceDirectory": "D:/CSE_Semesters_Data/offline_finance_management_app/windows",
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }
