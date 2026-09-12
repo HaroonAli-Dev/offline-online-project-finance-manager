@@ -165,17 +165,16 @@ class _PageHelpIconButtonState extends ConsumerState<PageHelpIconButton> {
     // Active (hint showing): plain icon button, no background
     return isVisible
         ? IconButton(
-            icon: const Icon(Icons.help, size: 22),
+            icon: const Icon(Icons.help_outline, size: 22),
             tooltip: 'Hide Help',
             onPressed: () =>
                 ref.read(hintPreferencesProvider.notifier).toggleHint(widget.pageKey),
           )
         : Container(
             margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Colors.green,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.black, width: 1.5),
             ),
             child: IconButton(
               icon: const Icon(Icons.help_outline, size: 22, color: Colors.black),
