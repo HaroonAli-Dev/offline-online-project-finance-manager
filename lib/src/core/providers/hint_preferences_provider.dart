@@ -8,36 +8,26 @@ final hintPreferencesProvider =
     });
 
 class PageGuideVisibilityNotifier extends StateNotifier<Map<String, bool>> {
+  // Default state: hint is hidden (false = hidden), button is green.
+  // When user clicks the green button, hint becomes visible (true).
   PageGuideVisibilityNotifier() : super({});
 
-  bool isVisible(String pageKey) {
-    return state[pageKey] ?? false;
-  }
+  /// Returns true when the hint panel is open/visible.
+  bool isVisible(String pageKey) => state[pageKey] ?? false;
 
-  bool isDismissed(String pageKey) {
-    return !isVisible(pageKey);
-  }
+  /// Returns true when the hint panel is hidden (default on every launch).
+  bool isDismissed(String pageKey) => !isVisible(pageKey);
 
   void setVisible(String pageKey, bool visible) {
-    final nextState = <String, bool>{...state};
-    if (visible) {
-      nextState[pageKey] = true;
-    } else {
-      nextState.remove(pageKey);
-    }
-    state = nextState;
+    state = {...state, pageKey: visible};
   }
 
   Future<void> setDismissed(String pageKey, bool dismissed) async {
     setVisible(pageKey, !dismissed);
   }
 
-  void toggleGuideVisible(String pageKey) {
-    setVisible(pageKey, !isVisible(pageKey));
-  }
-
   Future<void> toggleHint(String pageKey) async {
-    toggleGuideVisible(pageKey);
+    setVisible(pageKey, !isVisible(pageKey));
   }
 
   void clearAll() {

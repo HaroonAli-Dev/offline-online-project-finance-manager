@@ -26,6 +26,8 @@ class AppAuthState {
     this.user,
     this.isLoading = false,
     this.errorMessage,
+    this.emailError,
+    this.passwordError,
     this.isOfflineBypass = false,
     this.rememberMe = false,
     this.isRestoredOffline = false,
@@ -35,6 +37,8 @@ class AppAuthState {
   final User? user;
   final bool isLoading;
   final String? errorMessage;
+  final String? emailError;
+  final String? passwordError;
   final bool isOfflineBypass;
   final bool rememberMe;
   final bool isRestoredOffline;
@@ -46,6 +50,8 @@ class AppAuthState {
     User? Function()? user,
     bool? isLoading,
     String? Function()? errorMessage,
+    String? Function()? emailError,
+    String? Function()? passwordError,
     bool? isOfflineBypass,
     bool? rememberMe,
     bool? isRestoredOffline,
@@ -55,6 +61,8 @@ class AppAuthState {
       user: user != null ? user() : this.user,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
+      emailError: emailError != null ? emailError() : this.emailError,
+      passwordError: passwordError != null ? passwordError() : this.passwordError,
       isOfflineBypass: isOfflineBypass ?? this.isOfflineBypass,
       rememberMe: rememberMe ?? this.rememberMe,
       isRestoredOffline: isRestoredOffline ?? this.isRestoredOffline,
@@ -127,7 +135,12 @@ class AuthNotifier extends Notifier<AppAuthState> {
     String password, {
     bool rememberMe = false,
   }) async {
-    state = state.copyWith(isLoading: true, errorMessage: () => null);
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: () => null,
+      emailError: () => null,
+      passwordError: () => null,
+    );
     try {
       final authService = ref.read(authServiceProvider);
       final response = await authService.signInWithEmailAndPassword(
@@ -150,13 +163,44 @@ class AuthNotifier extends Notifier<AppAuthState> {
         user: () => user,
         isLoading: false,
         errorMessage: () => null,
+        emailError: () => null,
+        passwordError: () => null,
         isOfflineBypass: false,
         rememberMe: rememberMe,
         isRestoredOffline: false,
       );
       return true;
     } on AuthException catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: () => e.message);
+      final lower = e.message.toLowerCase();
+      final isInvalidCredentials =
+          lower.contains('invalid login credentials') ||
+          lower.contains('invalid email or password') ||
+          lower.contains('user not found') ||
+          lower.contains('wrong password');
+
+      if (isInvalidCredentials) {
+        // Supabase does not distinguish which field is wrong for security reasons.
+        // We use a simple heuristic: if the email looks valid, blame the password.
+        final emailLooksValid = email.trim().contains('@') && email.trim().contains('.');
+        if (emailLooksValid) {
+          state = state.copyWith(
+            isLoading: false,
+            emailError: () => null,
+            passwordError: () => 'Incorrect password. Please try again.',
+          );
+        } else {
+          state = state.copyWith(
+            isLoading: false,
+            emailError: () => 'No account found with this email address.',
+            passwordError: () => null,
+          );
+        }
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: () => _friendlySignInError(e.message),
+        );
+      }
       return false;
     } catch (e) {
       state = state.copyWith(
@@ -233,9 +277,36 @@ class AuthNotifier extends Notifier<AppAuthState> {
 
   /// Clear any error message.
   void clearError() {
-    if (state.errorMessage != null) {
-      state = state.copyWith(errorMessage: () => null);
+    if (state.errorMessage != null ||
+        state.emailError != null ||
+        state.passwordError != null) {
+      state = state.copyWith(
+        errorMessage: () => null,
+        emailError: () => null,
+        passwordError: () => null,
+      );
     }
+  }
+
+  /// Maps raw Supabase sign-in error messages to user-friendly text.
+  String _friendlySignInError(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('invalid login credentials') ||
+        lower.contains('invalid email or password') ||
+        lower.contains('wrong password') ||
+        lower.contains('user not found')) {
+      return 'Incorrect email or password. Please check your details and try again.';
+    }
+    if (lower.contains('email not confirmed')) {
+      return 'Your email address has not been confirmed yet. Please check your inbox.';
+    }
+    if (lower.contains('too many requests') || lower.contains('rate limit')) {
+      return 'Too many failed attempts. Please wait a moment before trying again.';
+    }
+    if (lower.contains('network') || lower.contains('connection')) {
+      return 'Network error. Please check your internet connection and try again.';
+    }
+    return raw;
   }
 }
 

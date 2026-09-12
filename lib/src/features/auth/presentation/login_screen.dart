@@ -184,10 +184,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         keyboardType: TextInputType.emailAddress,
                         autocorrect: false,
                         textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Email',
-                          prefixIcon: Icon(Icons.email_outlined),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.email_outlined),
+                          border: const OutlineInputBorder(),
+                          errorText: authState.emailError,
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -227,6 +228,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             },
                           ),
                           border: const OutlineInputBorder(),
+                          errorText: authState.passwordError,
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {

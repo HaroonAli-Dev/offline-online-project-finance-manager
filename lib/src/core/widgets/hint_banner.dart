@@ -52,16 +52,16 @@ class _HintBannerState extends ConsumerState<HintBanner>
     await _controller.reverse();
     ref
         .read(hintPreferencesProvider.notifier)
-        .setDismissed(widget.pageKey, true);
+        .setVisible(widget.pageKey, false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDismissed = ref.watch(
+    final isVisible = ref.watch(
       hintPreferencesProvider.select((map) => map[widget.pageKey] ?? false),
     );
 
-    if (isDismissed) return const SizedBox.shrink();
+    if (!isVisible) return const SizedBox.shrink();
 
     if (_controller.status == AnimationStatus.dismissed) {
       _controller.forward();
@@ -137,25 +137,44 @@ class _HintBannerState extends ConsumerState<HintBanner>
 }
 
 /// AppBar Action button to toggle the page hint on/off anytime.
-class PageHelpIconButton extends ConsumerWidget {
+/// Resets to default (green, hint hidden) when the page is navigated away from.
+class PageHelpIconButton extends ConsumerStatefulWidget {
   const PageHelpIconButton({super.key, required this.pageKey});
 
   final String pageKey;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isDismissed = ref.watch(
-      hintPreferencesProvider.select((map) => map[pageKey] ?? false),
+  ConsumerState<PageHelpIconButton> createState() => _PageHelpIconButtonState();
+}
+
+class _PageHelpIconButtonState extends ConsumerState<PageHelpIconButton> {
+  @override
+  void dispose() {
+    // Reset to hidden when the page is navigated away from.
+    ref.read(hintPreferencesProvider.notifier).setVisible(widget.pageKey, false);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isVisible = ref.watch(
+      hintPreferencesProvider.select((map) => map[widget.pageKey] ?? false),
     );
+    final colorScheme = Theme.of(context).colorScheme;
 
     return IconButton(
       icon: Icon(
-        isDismissed ? Icons.help_outline : Icons.help,
-        color: isDismissed ? null : Theme.of(context).colorScheme.primary,
+        isVisible ? Icons.help : Icons.help_outline,
+        color: isVisible ? null : colorScheme.primary,
       ),
-      tooltip: isDismissed ? 'Show Help Guidance' : 'Hide Help Guidance',
+      style: isVisible
+          ? null
+          : IconButton.styleFrom(
+              backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.35),
+            ),
+      tooltip: isVisible ? 'Hide Help' : 'Show Help',
       onPressed: () {
-        ref.read(hintPreferencesProvider.notifier).toggleHint(pageKey);
+        ref.read(hintPreferencesProvider.notifier).toggleHint(widget.pageKey);
       },
     );
   }
