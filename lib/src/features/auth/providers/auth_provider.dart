@@ -72,15 +72,17 @@ class AppAuthState {
 
 /// Notifier managing authentication state and actions.
 class AuthNotifier extends Notifier<AppAuthState> {
+  bool _isSigningUp = false;
+
   @override
   AppAuthState build() {
     final authService = ref.watch(authServiceProvider);
     final initialRestored = ref.watch(initialRestoredSessionProvider);
 
-    // Subscribe to Supabase auth state change events if active.
     final subscription = authService.authStateChanges.listen((data) {
-      // Only reset to unauthenticated on explicit sign out or account deletion.
-      // Temporary network loss or offline refresh errors must not clear the user.
+      // Ignore all auth events fired during sign-up flow.
+      if (_isSigningUp) return;
+
       if (data.event == AuthChangeEvent.signedOut) {
         state = const AppAuthState();
         return;
@@ -172,6 +174,7 @@ class AuthNotifier extends Notifier<AppAuthState> {
       return true;
     } on AuthException catch (e) {
       final lower = e.message.toLowerCase();
+
       final isInvalidCredentials =
           lower.contains('invalid login credentials') ||
           lower.contains('invalid email or password') ||
@@ -213,44 +216,39 @@ class AuthNotifier extends Notifier<AppAuthState> {
 
   /// Sign up with email and password.
   ///
-  /// When [rememberMe] is true, the session is saved as restoration eligible across restarts.
+  /// Returns true on success without logging in — caller switches to sign-in.
   Future<bool> signUp(
     String email,
     String password, {
     bool rememberMe = false,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: () => null);
+    _isSigningUp = true;
     try {
       final authService = ref.read(authServiceProvider);
-      final response = await authService.signUpWithEmailAndPassword(
+      await authService.signUpWithEmailAndPassword(
         email: email,
         password: password,
       );
-
-      final user = response.user ?? response.session?.user;
-      if (user != null) {
-        final localSessionService = ref.read(localSessionServiceProvider);
-        await localSessionService.saveSession(
-          userId: user.id,
-          email: user.email ?? email.trim(),
-          rememberMe: rememberMe,
-        );
-      }
-
+      // Sign out immediately — we don't want auto-login after sign-up.
+      await authService.signOut();
+      _isSigningUp = false;
       state = state.copyWith(
-        session: () => response.session,
-        user: () => user,
         isLoading: false,
         errorMessage: () => null,
-        isOfflineBypass: false,
-        rememberMe: rememberMe,
-        isRestoredOffline: false,
+        session: () => null,
+        user: () => null,
       );
       return true;
     } on AuthException catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: () => e.message);
+      _isSigningUp = false;
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: () => _friendlySignUpError(e.message),
+      );
       return false;
     } catch (e) {
+      _isSigningUp = false;
       state = state.copyWith(
         isLoading: false,
         errorMessage: () => 'An unexpected error occurred. Please try again.',
@@ -298,13 +296,28 @@ class AuthNotifier extends Notifier<AppAuthState> {
       return 'Incorrect email or password. Please check your details and try again.';
     }
     if (lower.contains('email not confirmed')) {
-      return 'Your email address has not been confirmed yet. Please check your inbox.';
+      return 'Your email is not confirmed yet. Please check your inbox and confirm your address before signing in.';
     }
     if (lower.contains('too many requests') || lower.contains('rate limit')) {
       return 'Too many failed attempts. Please wait a moment before trying again.';
     }
     if (lower.contains('network') || lower.contains('connection')) {
       return 'Network error. Please check your internet connection and try again.';
+    }
+    return raw;
+  }
+
+  /// Maps raw Supabase sign-up error messages to user-friendly text.
+  String _friendlySignUpError(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('already registered') || lower.contains('already exists') || lower.contains('user already')) {
+      return 'An account with this email already exists. Please sign in instead.';
+    }
+    if (lower.contains('invalid email')) {
+      return 'Please enter a valid email address.';
+    }
+    if (lower.contains('password')) {
+      return 'Password must be at least 6 characters.';
     }
     return raw;
   }

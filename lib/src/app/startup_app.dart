@@ -11,47 +11,34 @@ import '../features/auth/services/local_session_service.dart';
 import 'app.dart';
 
 class StartupApp extends StatelessWidget {
-  const StartupApp({
-    super.key,
-    required this.databaseFuture,
-    this.readyChild,
-    this.localSessionService,
-  });
+  const StartupApp({super.key, this.readyChild, this.localSessionService});
 
-  final Future<AppDatabase> databaseFuture;
   final Widget? readyChild;
   final LocalSessionService? localSessionService;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Finance & Construction Manager',
-      debugShowCheckedModeBanner: false,
-      theme: appTheme,
-      home: _StartupGate(
-        databaseFuture: databaseFuture,
-        readyChild: readyChild,
-        localSessionService: localSessionService,
+    return ProviderScope(
+      overrides: [
+        if (localSessionService != null)
+          localSessionServiceProvider.overrideWithValue(localSessionService!),
+      ],
+      child: MaterialApp(
+        title: 'Finance & Construction Manager',
+        debugShowCheckedModeBanner: false,
+        theme: appTheme,
+        home: _StartupGate(
+          readyChild: readyChild,
+          localSessionService: localSessionService,
+        ),
       ),
     );
   }
 }
 
-class _StartupResult {
-  const _StartupResult({required this.database, this.restoredSession});
-
-  final AppDatabase database;
-  final LocalSessionData? restoredSession;
-}
-
 class _StartupGate extends StatefulWidget {
-  const _StartupGate({
-    required this.databaseFuture,
-    this.readyChild,
-    this.localSessionService,
-  });
+  const _StartupGate({this.readyChild, this.localSessionService});
 
-  final Future<AppDatabase> databaseFuture;
   final Widget? readyChild;
   final LocalSessionService? localSessionService;
 
@@ -61,8 +48,8 @@ class _StartupGate extends StatefulWidget {
 
 class _StartupGateState extends State<_StartupGate>
     with WidgetsBindingObserver {
-  late Future<_StartupResult> _startupFuture;
   late final LocalSessionService _sessionService;
+  late Future<LocalSessionData?> _sessionFuture;
 
   @override
   void initState() {
@@ -70,13 +57,11 @@ class _StartupGateState extends State<_StartupGate>
     WidgetsBinding.instance.addObserver(this);
     _sessionService =
         widget.localSessionService ?? LocalSessionService.instance;
-    _startupFuture = _initStartup();
+    _sessionFuture = _initSession();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // When app is closed, detached, or hidden:
-    // If Remember Me was disabled, clear the session locally.
     if (state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
       _sessionService.isRememberMeEnabled().then((enabled) {
@@ -98,78 +83,137 @@ class _StartupGateState extends State<_StartupGate>
     super.dispose();
   }
 
-  Future<_StartupResult> _initStartup() async {
-    final database = await widget.databaseFuture;
-
-    // Load local session state
+  Future<LocalSessionData?> _initSession() async {
     final rawSession = await _sessionService.getRawSession();
-
-    if (rawSession == null) {
-      // No local authenticated user -> Show Login Page
-      return _StartupResult(database: database, restoredSession: null);
-    }
-
+    if (rawSession == null) return null;
     if (!rawSession.rememberMe) {
-      // Remember Me disabled -> Clear session -> Show Login Page
       await _sessionService.clearSession();
       if (SupabaseConfig.isInitialized) {
         try {
           await SupabaseConfig.client.auth.signOut();
         } catch (_) {}
       }
-      return _StartupResult(database: database, restoredSession: null);
+      return null;
     }
-
-    // Remember Me enabled -> Restore local authenticated state
-    final restored = await _sessionService.loadRestorationSession();
-    return _StartupResult(database: database, restoredSession: restored);
+    return _sessionService.loadRestorationSession();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<_StartupResult>(
-      future: _startupFuture,
+    return FutureBuilder<LocalSessionData?>(
+      future: _sessionFuture,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return _StartupError(error: snapshot.error);
         }
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const _StartupSplash(key: ValueKey('splash'));
+        }
 
-        final result = snapshot.data;
         return AnimatedSwitcher(
           duration: const Duration(milliseconds: 700),
           switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeInCubic,
-          child: result == null
-              ? const _StartupSplash(key: ValueKey('splash'))
-              : ProviderScope(
-                  key: const ValueKey('application'),
-                  overrides: [
-                    appDatabaseProvider.overrideWithValue(result.database),
-                    localSessionServiceProvider.overrideWithValue(
-                      _sessionService,
-                    ),
-                    if (result.restoredSession != null)
-                      initialRestoredSessionProvider.overrideWithValue(
-                        result.restoredSession,
-                      ),
-                  ],
-                  child: SyncTriggerHost(
-                    child: widget.readyChild ?? const _AuthGate(),
-                  ),
-                ),
+          child: ProviderScope(
+            key: const ValueKey('application'),
+            overrides: [
+              localSessionServiceProvider.overrideWithValue(_sessionService),
+              if (snapshot.data != null)
+                initialRestoredSessionProvider.overrideWithValue(snapshot.data),
+            ],
+            child: _AuthGate(
+              restoredSession: snapshot.data,
+              readyChild: widget.readyChild,
+            ),
+          ),
         );
       },
     );
   }
 }
 
-class _AuthGate extends ConsumerWidget {
-  const _AuthGate();
+/// Opens a per-user database and provides it to the app.
+/// Each user gets their own isolated SQLite file: finance_construction_(userId)
+class _AuthGate extends ConsumerStatefulWidget {
+  const _AuthGate({this.restoredSession, this.readyChild});
+
+  final LocalSessionData? restoredSession;
+  final Widget? readyChild;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends ConsumerState<_AuthGate> {
+  AppDatabase? _database;
+  String? _openedForUserId;
+
+  Future<AppDatabase> _openDatabaseForUser(String userId) async {
+    // Sanitize userId to be safe as a filename (keep alphanumeric + hyphens)
+    final safeName = userId.replaceAll(RegExp(r'[^a-zA-Z0-9\-]'), '_');
+    final db = AppDatabase(null, 'finance_construction_$safeName');
+    await db.validateConnection();
+    return db;
+  }
+
+  @override
+  void dispose() {
+    _database?.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
-    return isAuthenticated ? const MainNavigationShell() : const LoginScreen();
+    final authState = ref.watch(authStateProvider);
+
+    if (!isAuthenticated) {
+      // Close DB when user logs out
+      if (_database != null) {
+        _database!.close();
+        _database = null;
+        _openedForUserId = null;
+      }
+      return const LoginScreen();
+    }
+
+    final userId =
+        authState.user?.id ?? widget.restoredSession?.userId ?? 'offline';
+
+    // Already have the right DB open
+    if (_database != null && _openedForUserId == userId) {
+      return ProviderScope(
+        overrides: [appDatabaseProvider.overrideWithValue(_database!)],
+        child: SyncTriggerHost(
+          child: widget.readyChild ?? const MainNavigationShell(),
+        ),
+      );
+    }
+
+    // Need to open DB for this user
+    return FutureBuilder<AppDatabase>(
+      future: _openDatabaseForUser(userId),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _StartupError(error: snapshot.error);
+        }
+        if (!snapshot.hasData) {
+          return const _StartupSplash(key: ValueKey('db-loading'));
+        }
+
+        // Cache it
+        _database?.close();
+        _database = snapshot.data!;
+        _openedForUserId = userId;
+
+        return ProviderScope(
+          overrides: [appDatabaseProvider.overrideWithValue(_database!)],
+          child: SyncTriggerHost(
+            child: widget.readyChild ?? const MainNavigationShell(),
+          ),
+        );
+      },
+    );
   }
 }
 

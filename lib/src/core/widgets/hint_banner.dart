@@ -160,22 +160,31 @@ class _PageHelpIconButtonState extends ConsumerState<PageHelpIconButton> {
     final isVisible = ref.watch(
       hintPreferencesProvider.select((map) => map[widget.pageKey] ?? false),
     );
-    final colorScheme = Theme.of(context).colorScheme;
 
-    return IconButton(
-      icon: Icon(
-        isVisible ? Icons.help : Icons.help_outline,
-        color: isVisible ? null : colorScheme.primary,
-      ),
-      style: isVisible
-          ? null
-          : IconButton.styleFrom(
-              backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.35),
+    // Default (hint hidden): solid green circle, black outline, black ? icon
+    // Active (hint showing): plain icon button, no background
+    return isVisible
+        ? IconButton(
+            icon: const Icon(Icons.help, size: 22),
+            tooltip: 'Hide Help',
+            onPressed: () =>
+                ref.read(hintPreferencesProvider.notifier).toggleHint(widget.pageKey),
+          )
+        : Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.black, width: 1.5),
             ),
-      tooltip: isVisible ? 'Hide Help' : 'Show Help',
-      onPressed: () {
-        ref.read(hintPreferencesProvider.notifier).toggleHint(widget.pageKey);
-      },
-    );
+            child: IconButton(
+              icon: const Icon(Icons.help_outline, size: 22, color: Colors.black),
+              tooltip: 'Show Help',
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              onPressed: () =>
+                  ref.read(hintPreferencesProvider.notifier).toggleHint(widget.pageKey),
+            ),
+          );
   }
 }

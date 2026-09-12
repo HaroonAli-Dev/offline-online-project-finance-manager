@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:offline_finance_management_app/src/core/providers/database_provider.dart';
 import 'package:offline_finance_management_app/src/app/app.dart';
 import 'package:offline_finance_management_app/src/app/startup_app.dart';
 import 'package:offline_finance_management_app/src/core/database/app_database.dart';
@@ -359,11 +360,8 @@ void main() {
     testWidgets(
       'shows LoginScreen when unauthenticated and database is ready',
       (tester) async {
-        final database = AppDatabase(NativeDatabase.memory());
-        addTearDown(database.close);
-
         await tester.pumpWidget(
-          StartupApp(databaseFuture: Future.value(database)),
+          const StartupApp(),
         );
 
         await tester.pump();
@@ -389,9 +387,13 @@ void main() {
         );
 
         await tester.pumpWidget(
-          StartupApp(
-            databaseFuture: Future.value(database),
-            localSessionService: localSessionService,
+          ProviderScope(
+            overrides: [
+              appDatabaseProvider.overrideWithValue(database),
+            ],
+            child: StartupApp(
+              localSessionService: localSessionService,
+            ),
           ),
         );
 
@@ -420,9 +422,13 @@ void main() {
         );
 
         await tester.pumpWidget(
-          StartupApp(
-            databaseFuture: Future.value(database),
-            localSessionService: localSessionService,
+          ProviderScope(
+            overrides: [
+              appDatabaseProvider.overrideWithValue(database),
+            ],
+            child: StartupApp(
+              localSessionService: localSessionService,
+            ),
           ),
         );
 

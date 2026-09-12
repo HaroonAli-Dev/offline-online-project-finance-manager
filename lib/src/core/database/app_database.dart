@@ -39,11 +39,11 @@ part 'app_database.g.dart';
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase([QueryExecutor? executor])
+  AppDatabase([QueryExecutor? executor, String? dbName])
     : super(
         executor ??
             driftDatabase(
-              name: 'finance_construction',
+              name: dbName ?? 'finance_construction',
               native: const DriftNativeOptions(shareAcrossIsolates: true),
               web: DriftWebOptions(
                 sqlite3Wasm: Uri.parse('sqlite3.wasm'),

@@ -22,6 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _rememberMe = false;
+  String? _signUpSuccessEmail; // set after successful sign-up to show green banner
 
   @override
   void dispose() {
@@ -35,6 +36,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() {
       _isSignUp = !_isSignUp;
       _confirmPasswordController.clear();
+      _signUpSuccessEmail = null;
     });
     ref.read(authStateProvider.notifier).clearError();
   }
@@ -44,10 +46,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-
     final authNotifier = ref.read(authStateProvider.notifier);
+
     if (_isSignUp) {
-      await authNotifier.signUp(email, password, rememberMe: _rememberMe);
+      final success = await authNotifier.signUp(email, password, rememberMe: _rememberMe);
+      if (success && mounted) {
+        // Switch to sign-in, pre-fill email, clear password, show success banner.
+        setState(() {
+          _isSignUp = false;
+          _signUpSuccessEmail = email;
+          _passwordController.clear();
+          _confirmPasswordController.clear();
+        });
+      }
     } else {
       await authNotifier.signIn(email, password, rememberMe: _rememberMe);
     }
@@ -147,7 +158,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(height: 16),
                       ],
 
-                      // Error message banner
+                      // Green success banner after account creation
+                      if (_signUpSuccessEmail != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.green.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle_outline,
+                                  color: Colors.green.shade700, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Account created! Now sign in with your email and password.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.green.shade800,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Red error banner
                       if (authState.errorMessage != null) ...[
                         Container(
                           padding: const EdgeInsets.all(12),

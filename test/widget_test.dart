@@ -38,7 +38,7 @@ void main() {
     expect(notifier.state, isEmpty);
     expect(notifier.isVisible('people'), isFalse);
 
-    notifier.toggleGuideVisible('people');
+    notifier.toggleHint('people');
     expect(notifier.isVisible('people'), isTrue);
 
     notifier.clearAll();

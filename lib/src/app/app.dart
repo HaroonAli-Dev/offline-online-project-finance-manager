@@ -70,83 +70,12 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
           return Scaffold(
             body: Row(
               children: [
-                SingleChildScrollView(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: IntrinsicHeight(
-                      child: NavigationRail(
-                        selectedIndex: _currentIndex,
-                        onDestinationSelected: (index) {
-                          setState(() => _currentIndex = index);
-                          ref.read(hintPreferencesProvider.notifier).clearAll();
-                        },
-                        labelType: NavigationRailLabelType.all,
-                        leading: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Image.asset(
-                            appLogoAsset,
-                            width: 44,
-                            height: 44,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                        destinations: const [
-                          NavigationRailDestination(
-                            icon: Icon(Icons.dashboard_outlined),
-                            selectedIcon: Icon(Icons.dashboard),
-                            label: Text('Dashboard'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.people_outline),
-                            selectedIcon: Icon(Icons.people),
-                            label: Text('People'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.location_city_outlined),
-                            selectedIcon: Icon(Icons.location_city),
-                            label: Text('Sites'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.assignment_outlined),
-                            selectedIcon: Icon(Icons.assignment),
-                            label: Text('Schemes'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.account_balance_wallet_outlined),
-                            selectedIcon: Icon(Icons.account_balance_wallet),
-                            label: Text('Transactions'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.receipt_long_outlined),
-                            selectedIcon: Icon(Icons.receipt_long),
-                            label: Text('Expenses'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.directions_bus_outlined),
-                            selectedIcon: Icon(Icons.directions_bus),
-                            label: Text('Vehicles'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.receipt_outlined),
-                            selectedIcon: Icon(Icons.receipt),
-                            label: Text('Bills'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.track_changes_outlined),
-                            selectedIcon: Icon(Icons.track_changes),
-                            label: Text('Progress'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.notifications_outlined),
-                            selectedIcon: Icon(Icons.notifications),
-                            label: Text('Reminders'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                _WindowsSidebar(
+                  currentIndex: _currentIndex,
+                  onDestinationSelected: (index) {
+                    setState(() => _currentIndex = index);
+                    ref.read(hintPreferencesProvider.notifier).clearAll();
+                  },
                 ),
                 const VerticalDivider(width: 1),
                 Expanded(child: _pages[_currentIndex]),
@@ -200,7 +129,6 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Material 3-style pill indicator around the icon
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(
@@ -264,6 +192,187 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
           ),
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Windows Sidebar — 2-column grid, Dashboard centered alone at top
+// ---------------------------------------------------------------------------
+
+class _WindowsSidebar extends StatelessWidget {
+  const _WindowsSidebar({
+    required this.currentIndex,
+    required this.onDestinationSelected,
+  });
+
+  final int currentIndex;
+  final ValueChanged<int> onDestinationSelected;
+
+  static const _destinations = [
+    (0, Icons.dashboard_outlined, Icons.dashboard, 'Dashboard'),
+    (1, Icons.people_outline, Icons.people, 'People'),
+    (2, Icons.location_city_outlined, Icons.location_city, 'Sites'),
+    (3, Icons.assignment_outlined, Icons.assignment, 'Schemes'),
+    (4, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Transactions'),
+    (5, Icons.receipt_long_outlined, Icons.receipt_long, 'Expenses'),
+    (6, Icons.directions_bus_outlined, Icons.directions_bus, 'Vehicles'),
+    (7, Icons.receipt_outlined, Icons.receipt, 'Bills'),
+    (8, Icons.track_changes_outlined, Icons.track_changes, 'Progress'),
+    (9, Icons.notifications_outlined, Icons.notifications, 'Reminders'),
+  ];
+
+  // Dashboard alone (index 0), then pairs, Reminders alone at end
+  static const _rows = [
+    [0],       // Dashboard — centered alone
+    [1, 2],    // People | Sites
+    [3, 4],    // Schemes | Transactions
+    [5, 6],    // Expenses | Vehicles
+    [7, 8],    // Bills | Progress
+    [9],       // Reminders — alone
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: 160,
+      color: colorScheme.surfaceContainer,
+      child: Column(
+        children: [
+          // Logo
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Image.asset(
+              appLogoAsset,
+              width: 36,
+              height: 36,
+              fit: BoxFit.contain,
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _rows.map((row) {
+                  final isSingle = row.length == 1;
+                  final d0 = _destinations[row[0]];
+
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: isSingle
+                          ? _SidebarButton(
+                              index: d0.$1,
+                              icon: d0.$2,
+                              selectedIcon: d0.$3,
+                              label: d0.$4,
+                              isSelected: currentIndex == d0.$1,
+                              onTap: onDestinationSelected,
+                              isDashboard: d0.$1 == 0,
+                            )
+                          : Row(
+                              children: [
+                                Expanded(
+                                  child: _SidebarButton(
+                                    index: d0.$1,
+                                    icon: d0.$2,
+                                    selectedIcon: d0.$3,
+                                    label: d0.$4,
+                                    isSelected: currentIndex == d0.$1,
+                                    onTap: onDestinationSelected,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Builder(builder: (_) {
+                                    final d1 = _destinations[row[1]];
+                                    return _SidebarButton(
+                                      index: d1.$1,
+                                      icon: d1.$2,
+                                      selectedIcon: d1.$3,
+                                      label: d1.$4,
+                                      isSelected: currentIndex == d1.$1,
+                                      onTap: onDestinationSelected,
+                                    );
+                                  }),
+                                ),
+                              ],
+                            ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SidebarButton extends StatelessWidget {
+  const _SidebarButton({
+    required this.index,
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.isDashboard = false,
+  });
+
+  final int index;
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool isSelected;
+  final ValueChanged<int> onTap;
+  final bool isDashboard;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: () => onTap(index),
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSelected ? selectedIcon : icon,
+              size: isDashboard ? 24 : 20,
+              color: isSelected
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                color: isSelected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
