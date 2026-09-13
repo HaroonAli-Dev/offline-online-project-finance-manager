@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:flutter_svg/flutter_svg.dart';
+
 import '../../../app/app.dart';
 import '../../../core/config/supabase_config.dart';
 import '../providers/auth_provider.dart';
@@ -23,7 +24,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _rememberMe = false;
-  String? _signUpSuccessEmail; // set after successful sign-up to show green banner
+  String?
+  _signUpSuccessEmail; // set after successful sign-up to show green banner
 
   @override
   void dispose() {
@@ -50,7 +52,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authNotifier = ref.read(authStateProvider.notifier);
 
     if (_isSignUp) {
-      final success = await authNotifier.signUp(email, password, rememberMe: _rememberMe);
+      final success = await authNotifier.signUp(
+        email,
+        password,
+        rememberMe: _rememberMe,
+      );
       if (success && mounted) {
         // Switch to sign-in, pre-fill email, clear password, show success banner.
         setState(() {
@@ -106,7 +112,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Finance & Construction Manager',
+                        'Offline Project Finance Management App',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
@@ -130,10 +136,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: colorScheme.tertiaryContainer.withValues(alpha: 0.6),
+                            color: colorScheme.tertiaryContainer.withValues(
+                              alpha: 0.6,
+                            ),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: colorScheme.tertiary.withValues(alpha: 0.4),
+                              color: colorScheme.tertiary.withValues(
+                                alpha: 0.4,
+                              ),
                             ),
                           ),
                           child: Row(
@@ -169,8 +179,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.check_circle_outline,
-                                  color: Colors.green.shade700, size: 20),
+                              Icon(
+                                Icons.check_circle_outline,
+                                color: Colors.green.shade700,
+                                size: 20,
+                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(

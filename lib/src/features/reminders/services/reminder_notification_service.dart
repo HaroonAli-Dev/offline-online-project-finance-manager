@@ -32,7 +32,7 @@ class ReminderNotificationService {
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         iOS: DarwinInitializationSettings(),
         windows: WindowsInitializationSettings(
-          appName: 'Finance & Construction Manager',
+          appName: 'Offline Project Finance Management App',
           appUserModelId: _windowsAppUserModelId,
           guid: _windowsNotificationGuid,
         ),

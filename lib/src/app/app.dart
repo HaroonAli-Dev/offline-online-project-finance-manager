@@ -29,7 +29,7 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return ProviderScope(
       child: MaterialApp(
-        title: 'offline_project_finance_manager',
+        title: 'Offline Project Finance Management App',
         debugShowCheckedModeBanner: false,
         theme: appTheme,
         home: const MainNavigationShell(),
@@ -216,7 +216,12 @@ class _WindowsSidebar extends StatelessWidget {
     (1, Icons.people_outline, Icons.people, 'People'),
     (2, Icons.location_city_outlined, Icons.location_city, 'Sites'),
     (3, Icons.assignment_outlined, Icons.assignment, 'Schemes'),
-    (4, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Transactions'),
+    (
+      4,
+      Icons.account_balance_wallet_outlined,
+      Icons.account_balance_wallet,
+      'Transactions',
+    ),
     (5, Icons.receipt_long_outlined, Icons.receipt_long, 'Expenses'),
     (6, Icons.directions_bus_outlined, Icons.directions_bus, 'Vehicles'),
     (7, Icons.receipt_outlined, Icons.receipt, 'Bills'),
@@ -226,12 +231,12 @@ class _WindowsSidebar extends StatelessWidget {
 
   // Dashboard alone (index 0), then pairs, Reminders alone at end
   static const _rows = [
-    [0],       // Dashboard — centered alone
-    [1, 2],    // People | Sites
-    [3, 4],    // Schemes | Transactions
-    [5, 6],    // Expenses | Vehicles
-    [7, 8],    // Bills | Progress
-    [9],       // Reminders — alone
+    [0], // Dashboard — centered alone
+    [1, 2], // People | Sites
+    [3, 4], // Schemes | Transactions
+    [5, 6], // Expenses | Vehicles
+    [7, 8], // Bills | Progress
+    [9], // Reminders — alone
   ];
 
   @override
@@ -246,11 +251,7 @@ class _WindowsSidebar extends StatelessWidget {
           // Logo
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: SvgPicture.asset(
-              appLogoAsset,
-              width: 36,
-              height: 36,
-            ),
+            child: SvgPicture.asset(appLogoAsset, width: 36, height: 36),
           ),
           const Divider(height: 1),
           Expanded(
@@ -289,17 +290,19 @@ class _WindowsSidebar extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 Expanded(
-                                  child: Builder(builder: (_) {
-                                    final d1 = _destinations[row[1]];
-                                    return _SidebarButton(
-                                      index: d1.$1,
-                                      icon: d1.$2,
-                                      selectedIcon: d1.$3,
-                                      label: d1.$4,
-                                      isSelected: currentIndex == d1.$1,
-                                      onTap: onDestinationSelected,
-                                    );
-                                  }),
+                                  child: Builder(
+                                    builder: (_) {
+                                      final d1 = _destinations[row[1]];
+                                      return _SidebarButton(
+                                        index: d1.$1,
+                                        icon: d1.$2,
+                                        selectedIcon: d1.$3,
+                                        label: d1.$4,
+                                        isSelected: currentIndex == d1.$1,
+                                        onTap: onDestinationSelected,
+                                      );
+                                    },
+                                  ),
                                 ),
                               ],
                             ),

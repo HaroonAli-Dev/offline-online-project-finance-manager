@@ -6,13 +6,14 @@ void main() {
   testWidgets(
     'shows the logo while initializing and opens the app when ready',
     (tester) async {
-      await tester.pumpWidget(
-        const StartupApp(readyChild: Text('Ready')),
-      );
+      await tester.pumpWidget(const StartupApp(readyChild: Text('Ready')));
 
       // Splash is shown while session future is resolving
       expect(find.byType(Image), findsWidgets);
-      expect(find.text('Finance & Construction Manager'), findsOneWidget);
+      expect(
+        find.text('Offline Project Finance Management App'),
+        findsOneWidget,
+      );
 
       // Let the session future complete (no saved session → unauthenticated)
       await tester.pump();

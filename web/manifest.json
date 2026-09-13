@@ -1,6 +1,6 @@
 {
-    "name": "offline_project_finance_manager",
-    "short_name": "offline_project_finance_manager",
+    "name": "Offline Project Finance Management App",
+    "short_name": "Offline Project Finance Management App",
     "id": ".",
     "start_url": "./",
     "display": "standalone",

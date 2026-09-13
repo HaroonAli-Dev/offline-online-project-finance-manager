@@ -11,10 +11,16 @@ import '../features/auth/services/local_session_service.dart';
 import 'app.dart';
 
 class StartupApp extends StatelessWidget {
-  const StartupApp({super.key, this.readyChild, this.localSessionService});
+  const StartupApp({
+    super.key,
+    this.readyChild,
+    this.localSessionService,
+    this.database,
+  });
 
   final Widget? readyChild;
   final LocalSessionService? localSessionService;
+  final AppDatabase? database;
 
   @override
   Widget build(BuildContext context) {
@@ -24,12 +30,13 @@ class StartupApp extends StatelessWidget {
           localSessionServiceProvider.overrideWithValue(localSessionService!),
       ],
       child: MaterialApp(
-        title: 'Finance & Construction Manager',
+        title: 'Offline Project Finance Management App',
         debugShowCheckedModeBanner: false,
         theme: appTheme,
         home: _StartupGate(
           readyChild: readyChild,
           localSessionService: localSessionService,
+          database: database,
         ),
       ),
     );
@@ -37,10 +44,15 @@ class StartupApp extends StatelessWidget {
 }
 
 class _StartupGate extends StatefulWidget {
-  const _StartupGate({this.readyChild, this.localSessionService});
+  const _StartupGate({
+    this.readyChild,
+    this.localSessionService,
+    this.database,
+  });
 
   final Widget? readyChild;
   final LocalSessionService? localSessionService;
+  final AppDatabase? database;
 
   @override
   State<_StartupGate> createState() => _StartupGateState();
@@ -124,6 +136,7 @@ class _StartupGateState extends State<_StartupGate>
             child: _AuthGate(
               restoredSession: snapshot.data,
               readyChild: widget.readyChild,
+              database: widget.database,
             ),
           ),
         );
@@ -135,10 +148,11 @@ class _StartupGateState extends State<_StartupGate>
 /// Opens a per-user database and provides it to the app.
 /// Each user gets their own isolated SQLite file: finance_construction_(userId)
 class _AuthGate extends ConsumerStatefulWidget {
-  const _AuthGate({this.restoredSession, this.readyChild});
+  const _AuthGate({this.restoredSession, this.readyChild, this.database});
 
   final LocalSessionData? restoredSession;
   final Widget? readyChild;
+  final AppDatabase? database;
 
   @override
   ConsumerState<_AuthGate> createState() => _AuthGateState();
@@ -148,7 +162,24 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
   AppDatabase? _database;
   String? _openedForUserId;
 
+  @override
+  void initState() {
+    super.initState();
+    final restoredSession = widget.restoredSession;
+    if (restoredSession != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref
+              .read(authStateProvider.notifier)
+              .restoreOfflineSession(restoredSession);
+        }
+      });
+    }
+  }
+
   Future<AppDatabase> _openDatabaseForUser(String userId) async {
+    if (widget.database != null) return widget.database!;
+
     // Sanitize userId to be safe as a filename (keep alphanumeric + hyphens)
     final safeName = userId.replaceAll(RegExp(r'[^a-zA-Z0-9\-]'), '_');
     final db = AppDatabase(null, 'finance_construction_$safeName');
@@ -164,7 +195,8 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    final isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final isAuthenticated =
+        ref.watch(isAuthenticatedProvider) || widget.restoredSession != null;
     final authState = ref.watch(authStateProvider);
 
     if (!isAuthenticated) {
@@ -251,7 +283,7 @@ class _StartupSplash extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'Finance & Construction Manager',
+                    'Offline Project Finance Management App',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: colorScheme.onSurface,

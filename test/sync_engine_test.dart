@@ -119,6 +119,12 @@ class MockAttachmentStorageClient implements AttachmentStorageClient {
   }
 }
 
+class _StatusCodeError implements Exception {
+  const _StatusCodeError(this.statusCode);
+
+  final int statusCode;
+}
+
 void main() {
   late AppDatabase database;
   late MockRemoteSyncClient remoteClient;
@@ -144,106 +150,158 @@ void main() {
   });
 
   group('SyncEngine Unit Tests', () {
-    test('skips synchronization if userId is null or unauthenticated', () async {
-      final success = await syncEngine.sync(userId: null);
-      expect(success, isFalse);
-      expect(syncEngine.status.state, equals(SyncEngineState.idle));
+    test('classifies quota errors for users', () {
+      expect(
+        syncFailureMessage(Exception('Storage quota exceeded')),
+        contains('cloud storage may be full'),
+      );
+      expect(
+        syncFailureMessage(const _StatusCodeError(413)),
+        contains('cloud storage may be full'),
+      );
     });
 
-    test('skips synchronization if remoteClient is not configured (offline mode)', () async {
-      final engineWithoutClient = SyncEngine(database: database, remoteClient: null);
-      final success = await engineWithoutClient.sync(userId: testUserId);
-      expect(success, isFalse);
-      expect(engineWithoutClient.status.state, equals(SyncEngineState.offline));
-      engineWithoutClient.dispose();
+    test('classifies access and network errors for users', () {
+      expect(
+        syncFailureMessage(const _StatusCodeError(403)),
+        contains('cloud access was denied'),
+      );
+      expect(
+        syncFailureMessage(Exception('Connection timed out')),
+        contains('network is unavailable'),
+      );
     });
 
-    test('pushes local insert from SyncOutbox to remote and deletes outbox row', () async {
-      final personId = uuid.v4();
-      final now = DateTime.now().toUtc();
+    test(
+      'skips synchronization if userId is null or unauthenticated',
+      () async {
+        final success = await syncEngine.sync(userId: null);
+        expect(success, isFalse);
+        expect(syncEngine.status.state, equals(SyncEngineState.idle));
+      },
+    );
 
-      // 1. Insert local person record
-      await database.into(database.people).insert(
-            PeopleCompanion.insert(
-              id: personId,
-              fullName: 'John Doe',
-              createdAt: now,
-              updatedAt: now,
-            ),
-          );
+    test(
+      'skips synchronization if remoteClient is not configured (offline mode)',
+      () async {
+        final engineWithoutClient = SyncEngine(
+          database: database,
+          remoteClient: null,
+        );
+        final success = await engineWithoutClient.sync(userId: testUserId);
+        expect(success, isFalse);
+        expect(
+          engineWithoutClient.status.state,
+          equals(SyncEngineState.offline),
+        );
+        engineWithoutClient.dispose();
+      },
+    );
 
-      // 2. Insert outbox entry
-      await database.into(database.syncOutbox).insert(
-            SyncOutboxCompanion.insert(
-              id: uuid.v4(),
-              entityType: 'people',
-              entityId: personId,
-              operation: 'insert',
-              createdAt: Value(now),
-              updatedAt: Value(now),
-            ),
-          );
+    test(
+      'pushes local insert from SyncOutbox to remote and deletes outbox row',
+      () async {
+        final personId = uuid.v4();
+        final now = DateTime.now().toUtc();
 
-      expect(await database.syncOutbox.count().getSingle(), equals(1));
+        // 1. Insert local person record
+        await database
+            .into(database.people)
+            .insert(
+              PeopleCompanion.insert(
+                id: personId,
+                fullName: 'John Doe',
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
 
-      // 3. Run sync
-      final success = await syncEngine.sync(userId: testUserId);
-      expect(success, isTrue);
+        // 2. Insert outbox entry
+        await database
+            .into(database.syncOutbox)
+            .insert(
+              SyncOutboxCompanion.insert(
+                id: uuid.v4(),
+                entityType: 'people',
+                entityId: personId,
+                operation: 'insert',
+                createdAt: Value(now),
+                updatedAt: Value(now),
+              ),
+            );
 
-      // 4. Assert outbox was processed and removed
-      expect(await database.syncOutbox.count().getSingle(), equals(0));
+        expect(await database.syncOutbox.count().getSingle(), equals(1));
 
-      // 5. Assert remote client received the record with correct user_id
-      final remotePeople = remoteClient.tables['people'];
-      expect(remotePeople, isNotNull);
-      expect(remotePeople!.length, equals(1));
-      expect(remotePeople.first['id'], equals(personId));
-      expect(remotePeople.first['user_id'], equals(testUserId));
-      expect(remotePeople.first['full_name'], equals('John Doe'));
-    });
+        // 3. Run sync
+        final success = await syncEngine.sync(userId: testUserId);
+        expect(success, isTrue);
 
-    test('soft delete propagates to remote client with deleted_at timestamp', () async {
-      final siteId = uuid.v4();
-      final createdTime = DateTime.now().toUtc().subtract(const Duration(hours: 1));
-      final deletedTime = DateTime.now().toUtc();
+        // 4. Assert outbox was processed and removed
+        expect(await database.syncOutbox.count().getSingle(), equals(0));
 
-      // Insert soft-deleted site
-      await database.into(database.sites).insert(
-            SitesCompanion.insert(
-              id: siteId,
-              name: 'Site Alpha',
-              createdAt: createdTime,
-              updatedAt: deletedTime,
-              deletedAt: Value(deletedTime),
-            ),
-          );
+        // 5. Assert remote client received the record with correct user_id
+        final remotePeople = remoteClient.tables['people'];
+        expect(remotePeople, isNotNull);
+        expect(remotePeople!.length, equals(1));
+        expect(remotePeople.first['id'], equals(personId));
+        expect(remotePeople.first['user_id'], equals(testUserId));
+        expect(remotePeople.first['full_name'], equals('John Doe'));
+      },
+    );
 
-      // Enqueue delete outbox
-      await database.into(database.syncOutbox).insert(
-            SyncOutboxCompanion.insert(
-              id: uuid.v4(),
-              entityType: 'sites',
-              entityId: siteId,
-              operation: 'delete',
-              createdAt: Value(deletedTime),
-              updatedAt: Value(deletedTime),
-            ),
-          );
+    test(
+      'soft delete propagates to remote client with deleted_at timestamp',
+      () async {
+        final siteId = uuid.v4();
+        final createdTime = DateTime.now().toUtc().subtract(
+          const Duration(hours: 1),
+        );
+        final deletedTime = DateTime.now().toUtc();
 
-      final success = await syncEngine.sync(userId: testUserId);
-      expect(success, isTrue);
-      expect(await database.syncOutbox.count().getSingle(), equals(0));
+        // Insert soft-deleted site
+        await database
+            .into(database.sites)
+            .insert(
+              SitesCompanion.insert(
+                id: siteId,
+                name: 'Site Alpha',
+                createdAt: createdTime,
+                updatedAt: deletedTime,
+                deletedAt: Value(deletedTime),
+              ),
+            );
 
-      final remoteSites = remoteClient.tables['sites'];
-      expect(remoteSites, isNotNull);
-      expect(remoteSites!.first['deleted_at'], isNotNull);
-    });
+        // Enqueue delete outbox
+        await database
+            .into(database.syncOutbox)
+            .insert(
+              SyncOutboxCompanion.insert(
+                id: uuid.v4(),
+                entityType: 'sites',
+                entityId: siteId,
+                operation: 'delete',
+                createdAt: Value(deletedTime),
+                updatedAt: Value(deletedTime),
+              ),
+            );
+
+        final success = await syncEngine.sync(userId: testUserId);
+        expect(success, isTrue);
+        expect(await database.syncOutbox.count().getSingle(), equals(0));
+
+        final remoteSites = remoteClient.tables['sites'];
+        expect(remoteSites, isNotNull);
+        expect(remoteSites!.first['deleted_at'], isNotNull);
+      },
+    );
 
     test('network failure leaves outbox row intact and updates attemptCount + backoff', () async {
       final schemeId = uuid.v4();
       final now = DateTime.now().toUtc();
 
-      await database.into(database.schemes).insert(
+      await database
+          .into(database.schemes)
+          .insert(
             SchemesCompanion.insert(
               id: schemeId,
               schemeCode: 'SC-01',
@@ -253,7 +311,9 @@ void main() {
             ),
           );
 
-      await database.into(database.syncOutbox).insert(
+      await database
+          .into(database.syncOutbox)
+          .insert(
             SyncOutboxCompanion.insert(
               id: uuid.v4(),
               entityType: 'schemes',
@@ -281,8 +341,12 @@ void main() {
 
     test('pulls remote newer changes and applies them locally without outbox loops', () async {
       final remoteExpenseId = uuid.v4();
-      final remoteCreatedAt = DateTime.now().toUtc().subtract(const Duration(minutes: 10));
-      final remoteUpdatedAt = DateTime.now().toUtc().subtract(const Duration(minutes: 5));
+      final remoteCreatedAt = DateTime.now().toUtc().subtract(
+        const Duration(minutes: 10),
+      );
+      final remoteUpdatedAt = DateTime.now().toUtc().subtract(
+        const Duration(minutes: 5),
+      );
 
       // Populate remote client
       remoteClient.tables['expenses'] = [
@@ -302,16 +366,16 @@ void main() {
           'created_at': remoteCreatedAt.toIso8601String(),
           'updated_at': remoteUpdatedAt.toIso8601String(),
           'deleted_at': null,
-        }
+        },
       ];
 
       final success = await syncEngine.sync(userId: testUserId);
       expect(success, isTrue);
 
       // Assert expense was saved in SQLite locally
-      final localExpense = await (database.select(database.expenses)
-            ..where((t) => t.id.equals(remoteExpenseId)))
-          .getSingleOrNull();
+      final localExpense = await (database.select(
+        database.expenses,
+      )..where((t) => t.id.equals(remoteExpenseId))).getSingleOrNull();
 
       expect(localExpense, isNotNull);
       expect(localExpense!.expenseCode, equals('EXP-999'));
@@ -321,66 +385,81 @@ void main() {
       expect(await database.syncOutbox.count().getSingle(), equals(0));
     });
 
-    test('conflict resolution (LWW): local newer mutation wins over older remote', () async {
-      final transactionId = uuid.v4();
-      final remoteTime = DateTime.now().toUtc().subtract(const Duration(minutes: 10));
-      final localNewerTime = DateTime.now().toUtc().subtract(const Duration(minutes: 1));
+    test(
+      'conflict resolution (LWW): local newer mutation wins over older remote',
+      () async {
+        final transactionId = uuid.v4();
+        final remoteTime = DateTime.now().toUtc().subtract(
+          const Duration(minutes: 10),
+        );
+        final localNewerTime = DateTime.now().toUtc().subtract(
+          const Duration(minutes: 1),
+        );
 
-      // Local has a newer amount update
-      await database.into(database.transactions).insert(
-            TransactionsCompanion.insert(
-              id: transactionId,
-              transactionCode: 'TX-01',
-              transactionDate: localNewerTime,
-              type: 'paid',
-              amount: const Value(99000), // Newer amount
-              purpose: 'Local modification',
-              createdAt: remoteTime,
-              updatedAt: localNewerTime,
-            ),
-          );
+        // Local has a newer amount update
+        await database
+            .into(database.transactions)
+            .insert(
+              TransactionsCompanion.insert(
+                id: transactionId,
+                transactionCode: 'TX-01',
+                transactionDate: localNewerTime,
+                type: 'paid',
+                amount: const Value(99000), // Newer amount
+                purpose: 'Local modification',
+                createdAt: remoteTime,
+                updatedAt: localNewerTime,
+              ),
+            );
 
-      // Remote has older amount
-      remoteClient.tables['transactions'] = [
-        {
-          'id': transactionId,
-          'user_id': testUserId,
-          'transaction_code': 'TX-01',
-          'transaction_date': remoteTime.toIso8601String(),
-          'type': 'paid',
-          'person_id': null,
-          'amount': 50000, // Older amount
-          'purpose': 'Old remote record',
-          'payment_method': 'cash',
-          'reference_number': null,
-          'remarks': null,
-          'scheme_id': null,
-          'site_id': null,
-          'created_at': remoteTime.toIso8601String(),
-          'updated_at': remoteTime.toIso8601String(),
-          'deleted_at': null,
-        }
-      ];
+        // Remote has older amount
+        remoteClient.tables['transactions'] = [
+          {
+            'id': transactionId,
+            'user_id': testUserId,
+            'transaction_code': 'TX-01',
+            'transaction_date': remoteTime.toIso8601String(),
+            'type': 'paid',
+            'person_id': null,
+            'amount': 50000, // Older amount
+            'purpose': 'Old remote record',
+            'payment_method': 'cash',
+            'reference_number': null,
+            'remarks': null,
+            'scheme_id': null,
+            'site_id': null,
+            'created_at': remoteTime.toIso8601String(),
+            'updated_at': remoteTime.toIso8601String(),
+            'deleted_at': null,
+          },
+        ];
 
-      // Run pull / sync
-      await syncEngine.sync(userId: testUserId);
+        // Run pull / sync
+        await syncEngine.sync(userId: testUserId);
 
-      // Assert local record was preserved and NOT overwritten by older remote
-      final currentLocal = await (database.select(database.transactions)
-            ..where((t) => t.id.equals(transactionId)))
-          .getSingle();
+        // Assert local record was preserved and NOT overwritten by older remote
+        final currentLocal = await (database.select(
+          database.transactions,
+        )..where((t) => t.id.equals(transactionId))).getSingle();
 
-      expect(currentLocal.amount, equals(99000));
-      expect(currentLocal.purpose, equals('Local modification'));
-    });
+        expect(currentLocal.amount, equals(99000));
+        expect(currentLocal.purpose, equals('Local modification'));
+      },
+    );
 
     test('remotely deleted record applies soft delete locally', () async {
       final billId = uuid.v4();
-      final createdTime = DateTime.now().toUtc().subtract(const Duration(hours: 1));
-      final remoteDeletedTime = DateTime.now().toUtc().subtract(const Duration(minutes: 2));
+      final createdTime = DateTime.now().toUtc().subtract(
+        const Duration(hours: 1),
+      );
+      final remoteDeletedTime = DateTime.now().toUtc().subtract(
+        const Duration(minutes: 2),
+      );
 
       // Initially active local bill
-      await database.into(database.bills).insert(
+      await database
+          .into(database.bills)
+          .insert(
             BillsCompanion.insert(
               id: billId,
               schemeId: 'dummy-scheme',
@@ -407,17 +486,20 @@ void main() {
           'created_at': createdTime.toIso8601String(),
           'updated_at': remoteDeletedTime.toIso8601String(),
           'deleted_at': remoteDeletedTime.toIso8601String(),
-        }
+        },
       ];
 
       await syncEngine.sync(userId: testUserId);
 
-      final localBill = await (database.select(database.bills)
-            ..where((t) => t.id.equals(billId)))
-          .getSingle();
+      final localBill = await (database.select(
+        database.bills,
+      )..where((t) => t.id.equals(billId))).getSingle();
 
       expect(localBill.deletedAt, isNotNull);
-      expect(localBill.deletedAt!.difference(remoteDeletedTime).inSeconds.abs(), lessThanOrEqualTo(1));
+      expect(
+        localBill.deletedAt!.difference(remoteDeletedTime).inSeconds.abs(),
+        lessThanOrEqualTo(1),
+      );
     });
 
     group('Phase 5: Attachment Binary & Storage Synchronization', () {
@@ -476,80 +558,99 @@ void main() {
         expect(storageClient.downloadCallCount, equals(1));
       });
 
-      test('duplicate upload does not fail and overwrites idempotently', () async {
-        final service = AttachmentStorageService(storageClient: storageClient);
-        final bytes = Uint8List.fromList([1, 2, 3]);
+      test(
+        'duplicate upload does not fail and overwrites idempotently',
+        () async {
+          final service = AttachmentStorageService(
+            storageClient: storageClient,
+          );
+          final bytes = Uint8List.fromList([1, 2, 3]);
 
-        final path1 = await service.uploadAttachment(
-          userId: testUserId,
-          entityType: 'scheme',
-          attachmentId: 'att-dup',
-          fileName: 'photo.jpg',
-          bytes: bytes,
-        );
+          final path1 = await service.uploadAttachment(
+            userId: testUserId,
+            entityType: 'scheme',
+            attachmentId: 'att-dup',
+            fileName: 'photo.jpg',
+            bytes: bytes,
+          );
 
-        final path2 = await service.uploadAttachment(
-          userId: testUserId,
-          entityType: 'scheme',
-          attachmentId: 'att-dup',
-          fileName: 'photo.jpg',
-          bytes: bytes,
-        );
+          final path2 = await service.uploadAttachment(
+            userId: testUserId,
+            entityType: 'scheme',
+            attachmentId: 'att-dup',
+            fileName: 'photo.jpg',
+            bytes: bytes,
+          );
 
-        expect(path1, equals(path2));
-        expect(storageClient.uploadCallCount, equals(2));
-      });
+          expect(path1, equals(path2));
+          expect(storageClient.uploadCallCount, equals(2));
+        },
+      );
 
-      test('pushes attachment metadata to Supabase when already has storagePath', () async {
-        final attId = uuid.v4();
-        final now = DateTime.now().toUtc();
-        final existingCloudPath = '$testUserId/bill/$attId/receipt.png';
+      test(
+        'pushes attachment metadata to Supabase when already has storagePath',
+        () async {
+          final attId = uuid.v4();
+          final now = DateTime.now().toUtc();
+          final existingCloudPath = '$testUserId/bill/$attId/receipt.png';
 
-        // 1. Insert local attachment record already marked with storagePath
-        await database.into(database.attachments).insert(
-              AttachmentsCompanion.insert(
-                id: attId,
-                entityType: 'bill',
-                entityId: 'bill-123',
-                fileName: 'receipt.png',
-                storagePath: Value(existingCloudPath),
-                fileSize: const Value(1024),
-                category: const Value('receipt'),
-                capturedAt: now,
-                createdAt: now,
-                updatedAt: now,
-              ),
-            );
+          // 1. Insert local attachment record already marked with storagePath
+          await database
+              .into(database.attachments)
+              .insert(
+                AttachmentsCompanion.insert(
+                  id: attId,
+                  entityType: 'bill',
+                  entityId: 'bill-123',
+                  fileName: 'receipt.png',
+                  storagePath: Value(existingCloudPath),
+                  fileSize: const Value(1024),
+                  category: const Value('receipt'),
+                  capturedAt: now,
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              );
 
-        // 2. Insert outbox entry
-        await database.into(database.syncOutbox).insert(
-              SyncOutboxCompanion.insert(
-                id: uuid.v4(),
-                entityType: 'attachment',
-                entityId: attId,
-                operation: 'insert',
-                createdAt: Value(now),
-                updatedAt: Value(now),
-              ),
-            );
+          // 2. Insert outbox entry
+          await database
+              .into(database.syncOutbox)
+              .insert(
+                SyncOutboxCompanion.insert(
+                  id: uuid.v4(),
+                  entityType: 'attachment',
+                  entityId: attId,
+                  operation: 'insert',
+                  createdAt: Value(now),
+                  updatedAt: Value(now),
+                ),
+              );
 
-        // 3. Run sync
-        final success = await syncEngine.sync(userId: testUserId);
-        expect(success, isTrue);
+          // 3. Run sync
+          final success = await syncEngine.sync(userId: testUserId);
+          expect(success, isTrue);
 
-        // 4. Assert remote client received the attachment record
-        final remoteAttachments = remoteClient.tables['attachments'];
-        expect(remoteAttachments, isNotNull);
-        expect(remoteAttachments!.length, equals(1));
-        expect(remoteAttachments.first['id'], equals(attId));
-        expect(remoteAttachments.first['storage_path'], equals(existingCloudPath));
-        expect(remoteAttachments.first['user_id'], equals(testUserId));
-      });
+          // 4. Assert remote client received the attachment record
+          final remoteAttachments = remoteClient.tables['attachments'];
+          expect(remoteAttachments, isNotNull);
+          expect(remoteAttachments!.length, equals(1));
+          expect(remoteAttachments.first['id'], equals(attId));
+          expect(
+            remoteAttachments.first['storage_path'],
+            equals(existingCloudPath),
+          );
+          expect(remoteAttachments.first['user_id'], equals(testUserId));
+        },
+      );
 
       test('pulls remote attachment with storage_path and preserves local filePath if set', () async {
         final attId = uuid.v4();
-        final remoteCreatedAt = DateTime.now().toUtc().subtract(const Duration(minutes: 5));
-        final remoteUpdatedAt = DateTime.now().toUtc().subtract(const Duration(minutes: 2));
+        final remoteCreatedAt = DateTime.now().toUtc().subtract(
+          const Duration(minutes: 5),
+        );
+        final remoteUpdatedAt = DateTime.now().toUtc().subtract(
+          const Duration(minutes: 2),
+        );
         final cloudStoragePath = '$testUserId/scheme/$attId/site_photo.jpg';
 
         // Populate remote database
@@ -574,15 +675,15 @@ void main() {
             'created_at': remoteCreatedAt.toIso8601String(),
             'updated_at': remoteUpdatedAt.toIso8601String(),
             'deleted_at': null,
-          }
+          },
         ];
 
         final success = await syncEngine.sync(userId: testUserId);
         expect(success, isTrue);
 
-        final localAtt = await (database.select(database.attachments)
-              ..where((t) => t.id.equals(attId)))
-            .getSingleOrNull();
+        final localAtt = await (database.select(
+          database.attachments,
+        )..where((t) => t.id.equals(attId))).getSingleOrNull();
 
         expect(localAtt, isNotNull);
         expect(localAtt!.storagePath, equals(cloudStoragePath));
@@ -591,57 +692,69 @@ void main() {
         expect(localAtt.syncStatus, equals('synced'));
       });
 
-      test('soft-deleted attachment syncs deleted_at and skips uploading binary', () async {
-        final attId = uuid.v4();
-        final now = DateTime.now().toUtc();
+      test(
+        'soft-deleted attachment syncs deleted_at and skips uploading binary',
+        () async {
+          final attId = uuid.v4();
+          final now = DateTime.now().toUtc();
 
-        await database.into(database.attachments).insert(
-              AttachmentsCompanion.insert(
-                id: attId,
-                entityType: 'expense',
-                entityId: 'exp-1',
-                fileName: 'deleted_receipt.jpg',
-                filePath: const Value('/some/deleted/local/path.jpg'),
-                storagePath: const Value(null),
-                category: const Value('receipt'),
-                capturedAt: now,
-                createdAt: now,
-                updatedAt: now,
-                deletedAt: Value(now),
-              ),
-            );
+          await database
+              .into(database.attachments)
+              .insert(
+                AttachmentsCompanion.insert(
+                  id: attId,
+                  entityType: 'expense',
+                  entityId: 'exp-1',
+                  fileName: 'deleted_receipt.jpg',
+                  filePath: const Value('/some/deleted/local/path.jpg'),
+                  storagePath: const Value(null),
+                  category: const Value('receipt'),
+                  capturedAt: now,
+                  createdAt: now,
+                  updatedAt: now,
+                  deletedAt: Value(now),
+                ),
+              );
 
-        await database.into(database.syncOutbox).insert(
-              SyncOutboxCompanion.insert(
-                id: uuid.v4(),
-                entityType: 'attachment',
-                entityId: attId,
-                operation: 'delete',
-                createdAt: Value(now),
-                updatedAt: Value(now),
-              ),
-            );
+          await database
+              .into(database.syncOutbox)
+              .insert(
+                SyncOutboxCompanion.insert(
+                  id: uuid.v4(),
+                  entityType: 'attachment',
+                  entityId: attId,
+                  operation: 'delete',
+                  createdAt: Value(now),
+                  updatedAt: Value(now),
+                ),
+              );
 
-        final success = await syncEngine.sync(userId: testUserId);
-        expect(success, isTrue);
+          final success = await syncEngine.sync(userId: testUserId);
+          expect(success, isTrue);
 
-        // Binary storage upload was skipped because deletedAt != null
-        expect(storageClient.uploadCallCount, equals(0));
+          // Binary storage upload was skipped because deletedAt != null
+          expect(storageClient.uploadCallCount, equals(0));
 
-        // Remote metadata table received the soft-deleted attachment
-        final remoteAtts = remoteClient.tables['attachments'];
-        expect(remoteAtts, isNotNull);
-        expect(remoteAtts!.first['deleted_at'], isNotNull);
-      });
+          // Remote metadata table received the soft-deleted attachment
+          final remoteAtts = remoteClient.tables['attachments'];
+          expect(remoteAtts, isNotNull);
+          expect(remoteAtts!.first['deleted_at'], isNotNull);
+        },
+      );
 
       test('storage error handling and deleteFile', () async {
         final service = AttachmentStorageService(storageClient: storageClient);
 
         // Deleting when file exists
-        storageClient.storage['attachments/test/path.jpg'] = Uint8List.fromList([1, 2]);
+        storageClient.storage['attachments/test/path.jpg'] = Uint8List.fromList(
+          [1, 2],
+        );
         await service.deleteAttachment(storagePath: 'test/path.jpg');
         expect(storageClient.deleteCallCount, equals(1));
-        expect(storageClient.storage.containsKey('attachments/test/path.jpg'), isFalse);
+        expect(
+          storageClient.storage.containsKey('attachments/test/path.jpg'),
+          isFalse,
+        );
 
         // Storage failure during download throws
         storageClient.shouldThrow = true;
@@ -653,101 +766,119 @@ void main() {
     });
 
     group('Phase 6: Integration & Sync Hardening', () {
-      test('pushes reminder along with its reminder_entity_links to remote', () async {
-        final reminderId = uuid.v4();
-        final linkId = uuid.v4();
-        final now = DateTime.now().toUtc();
+      test(
+        'pushes reminder along with its reminder_entity_links to remote',
+        () async {
+          final reminderId = uuid.v4();
+          final linkId = uuid.v4();
+          final now = DateTime.now().toUtc();
 
-        // 1. Insert local reminder
-        await database.into(database.reminders).insert(
-              RemindersCompanion.insert(
-                id: reminderId,
-                title: 'Review bill documents',
-                priority: const Value('high'),
-                createdAt: now,
-                updatedAt: now,
-              ),
-            );
+          // 1. Insert local reminder
+          await database
+              .into(database.reminders)
+              .insert(
+                RemindersCompanion.insert(
+                  id: reminderId,
+                  title: 'Review bill documents',
+                  priority: const Value('high'),
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              );
 
-        // 2. Insert reminder entity link
-        await database.into(database.reminderEntityLinks).insert(
-              ReminderEntityLinksCompanion.insert(
-                id: linkId,
-                reminderId: reminderId,
-                entityType: 'bill',
-                entityId: 'bill-999',
-                createdAt: now,
-                updatedAt: now,
-              ),
-            );
+          // 2. Insert reminder entity link
+          await database
+              .into(database.reminderEntityLinks)
+              .insert(
+                ReminderEntityLinksCompanion.insert(
+                  id: linkId,
+                  reminderId: reminderId,
+                  entityType: 'bill',
+                  entityId: 'bill-999',
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              );
 
-        // 3. Enqueue outbox for reminder
-        await database.into(database.syncOutbox).insert(
-              SyncOutboxCompanion.insert(
-                id: uuid.v4(),
-                entityType: 'reminder',
-                entityId: reminderId,
-                operation: 'create',
-                createdAt: Value(now),
-                updatedAt: Value(now),
-              ),
-            );
+          // 3. Enqueue outbox for reminder
+          await database
+              .into(database.syncOutbox)
+              .insert(
+                SyncOutboxCompanion.insert(
+                  id: uuid.v4(),
+                  entityType: 'reminder',
+                  entityId: reminderId,
+                  operation: 'create',
+                  createdAt: Value(now),
+                  updatedAt: Value(now),
+                ),
+              );
 
-        final success = await syncEngine.sync(userId: testUserId);
-        expect(success, isTrue);
+          final success = await syncEngine.sync(userId: testUserId);
+          expect(success, isTrue);
 
-        // Verify both reminders and reminder_entity_links are populated remotely
-        final remoteReminders = remoteClient.tables['reminders'];
-        expect(remoteReminders, isNotNull);
-        expect(remoteReminders!.first['id'], equals(reminderId));
+          // Verify both reminders and reminder_entity_links are populated remotely
+          final remoteReminders = remoteClient.tables['reminders'];
+          expect(remoteReminders, isNotNull);
+          expect(remoteReminders!.first['id'], equals(reminderId));
 
-        final remoteLinks = remoteClient.tables['reminder_entity_links'];
-        expect(remoteLinks, isNotNull);
-        expect(remoteLinks!.first['reminder_id'], equals(reminderId));
-        expect(remoteLinks.first['entity_type'], equals('bill'));
-        expect(remoteLinks.first['entity_id'], equals('bill-999'));
-        expect(remoteLinks.first['user_id'], equals(testUserId));
-      });
+          final remoteLinks = remoteClient.tables['reminder_entity_links'];
+          expect(remoteLinks, isNotNull);
+          expect(remoteLinks!.first['reminder_id'], equals(reminderId));
+          expect(remoteLinks.first['entity_type'], equals('bill'));
+          expect(remoteLinks.first['entity_id'], equals('bill-999'));
+          expect(remoteLinks.first['user_id'], equals(testUserId));
+        },
+      );
 
-      test('processes individual person_role outbox entry cleanly without error', () async {
-        final personId = uuid.v4();
-        final now = DateTime.now().toUtc();
+      test(
+        'processes individual person_role outbox entry cleanly without error',
+        () async {
+          final personId = uuid.v4();
+          final now = DateTime.now().toUtc();
 
-        await database.into(database.people).insert(
-              PeopleCompanion.insert(
-                id: personId,
-                fullName: 'Alice Engineer',
-                createdAt: now,
-                updatedAt: now,
-              ),
-            );
+          await database
+              .into(database.people)
+              .insert(
+                PeopleCompanion.insert(
+                  id: personId,
+                  fullName: 'Alice Engineer',
+                  createdAt: now,
+                  updatedAt: now,
+                ),
+              );
 
-        await database.into(database.personRoles).insert(
-              PersonRolesCompanion.insert(
-                personId: personId,
-                roleCode: 'engineer',
-              ),
-            );
+          await database
+              .into(database.personRoles)
+              .insert(
+                PersonRolesCompanion.insert(
+                  personId: personId,
+                  roleCode: 'engineer',
+                ),
+              );
 
-        await database.into(database.syncOutbox).insert(
-              SyncOutboxCompanion.insert(
-                id: uuid.v4(),
-                entityType: 'person_role',
-                entityId: '${personId}_engineer',
-                operation: 'create',
-                createdAt: Value(now),
-                updatedAt: Value(now),
-              ),
-            );
+          await database
+              .into(database.syncOutbox)
+              .insert(
+                SyncOutboxCompanion.insert(
+                  id: uuid.v4(),
+                  entityType: 'person_role',
+                  entityId: '${personId}_engineer',
+                  operation: 'create',
+                  createdAt: Value(now),
+                  updatedAt: Value(now),
+                ),
+              );
 
-        final success = await syncEngine.sync(userId: testUserId);
-        expect(success, isTrue);
+          final success = await syncEngine.sync(userId: testUserId);
+          expect(success, isTrue);
 
-        final remoteRoles = remoteClient.tables['person_roles'];
-        expect(remoteRoles, isNotNull);
-        expect(remoteRoles!.first['person_id'], equals(personId));
-        expect(remoteRoles.first['role_code'], equals('engineer'));
-      });
+          final remoteRoles = remoteClient.tables['person_roles'];
+          expect(remoteRoles, isNotNull);
+          expect(remoteRoles!.first['person_id'], equals(personId));
+          expect(remoteRoles.first['role_code'], equals('engineer'));
+        },
+      );
     });
   });
 }

@@ -62,7 +62,9 @@ class AppAuthState {
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
       emailError: emailError != null ? emailError() : this.emailError,
-      passwordError: passwordError != null ? passwordError() : this.passwordError,
+      passwordError: passwordError != null
+          ? passwordError()
+          : this.passwordError,
       isOfflineBypass: isOfflineBypass ?? this.isOfflineBypass,
       rememberMe: rememberMe ?? this.rememberMe,
       isRestoredOffline: isRestoredOffline ?? this.isRestoredOffline,
@@ -73,6 +75,21 @@ class AppAuthState {
 /// Notifier managing authentication state and actions.
 class AuthNotifier extends Notifier<AppAuthState> {
   bool _isSigningUp = false;
+
+  void restoreOfflineSession(LocalSessionData session) {
+    state = AppAuthState(
+      user: User(
+        id: session.userId,
+        appMetadata: const {},
+        userMetadata: const {},
+        aud: 'authenticated',
+        createdAt: session.createdAt.toIso8601String(),
+        email: session.email,
+      ),
+      rememberMe: true,
+      isRestoredOffline: true,
+    );
+  }
 
   @override
   AppAuthState build() {
@@ -184,7 +201,8 @@ class AuthNotifier extends Notifier<AppAuthState> {
       if (isInvalidCredentials) {
         // Supabase does not distinguish which field is wrong for security reasons.
         // We use a simple heuristic: if the email looks valid, blame the password.
-        final emailLooksValid = email.trim().contains('@') && email.trim().contains('.');
+        final emailLooksValid =
+            email.trim().contains('@') && email.trim().contains('.');
         if (emailLooksValid) {
           state = state.copyWith(
             isLoading: false,
@@ -310,7 +328,9 @@ class AuthNotifier extends Notifier<AppAuthState> {
   /// Maps raw Supabase sign-up error messages to user-friendly text.
   String _friendlySignUpError(String raw) {
     final lower = raw.toLowerCase();
-    if (lower.contains('already registered') || lower.contains('already exists') || lower.contains('user already')) {
+    if (lower.contains('already registered') ||
+        lower.contains('already exists') ||
+        lower.contains('user already')) {
       return 'An account with this email already exists. Please sign in instead.';
     }
     if (lower.contains('invalid email')) {

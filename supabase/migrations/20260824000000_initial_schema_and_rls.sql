@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Supabase PostgreSQL Initial Schema & Row Level Security (RLS)
--- Offline-First Finance & Construction Management App
+-- Offline Project Finance Management App
 -- ============================================================================
 
 -- Ensure pgcrypto or uuid-ossp extension is enabled for UUID generation

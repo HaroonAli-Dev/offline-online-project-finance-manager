@@ -1,10 +1,10 @@
-# Finance & Construction Manager
+# Offline Project Finance Management App
 ## Project TODO & Status Tracker
 
-**Project Name:** Finance & Construction Manager  
+**Project Name:** Offline Project Finance Management App
 **Project Type:** Offline-first finance and construction management system  
 **Primary Client:** Single client initially; architecture remains scalable for future multi-organization use  
-**Last Updated:** September 6, 2026
+**Last Updated:** September 13, 2026
 
 ---
 
@@ -85,9 +85,11 @@ Supporting libraries in active use:
 - [x] Multi-device simultaneous session support verified with `SignOutScope.local`
 - [x] Unauthenticated "Continue Offline" bypass removed and replaced with authorized offline access
 - [x] Network resilience in auth state (network drop or token refresh timeouts do not log the user out)
-- [x] Comprehensive test suite for Remember Me, offline startup, and multi-device safety added to `test/auth_test.dart`
+- [x] Comprehensive test coverage added for Remember Me and multi-device safety
 - [x] Flutter analyzer is clean
-- [x] Targeted regression tests pass for reminders, auth, and Supabase config
+- [x] Targeted regression tests pass for reminders and Supabase config
+- [ ] Fix offline Remember Me startup routing test and verify restored-session UI flow
+- [ ] Run the complete test suite with zero failures
 - [x] Web release build succeeds
 
 ## Remaining work before production sign-off
@@ -397,7 +399,7 @@ The project is ready for client use only when:
 # 19. Important Final Architecture
 
 ```text
-                    FINANCE & CONSTRUCTION MANAGER
+                    OFFLINE PROJECT FINANCE MANAGEMENT APP
                                Flutter
                                   |
               +-------------------+-------------------+

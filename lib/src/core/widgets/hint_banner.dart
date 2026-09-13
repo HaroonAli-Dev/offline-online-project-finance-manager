@@ -149,13 +149,6 @@ class PageHelpIconButton extends ConsumerStatefulWidget {
 
 class _PageHelpIconButtonState extends ConsumerState<PageHelpIconButton> {
   @override
-  void dispose() {
-    // Reset to hidden when the page is navigated away from.
-    ref.read(hintPreferencesProvider.notifier).setVisible(widget.pageKey, false);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final isVisible = ref.watch(
       hintPreferencesProvider.select((map) => map[widget.pageKey] ?? false),
@@ -167,8 +160,9 @@ class _PageHelpIconButtonState extends ConsumerState<PageHelpIconButton> {
         ? IconButton(
             icon: const Icon(Icons.help_outline, size: 22),
             tooltip: 'Hide Help',
-            onPressed: () =>
-                ref.read(hintPreferencesProvider.notifier).toggleHint(widget.pageKey),
+            onPressed: () => ref
+                .read(hintPreferencesProvider.notifier)
+                .toggleHint(widget.pageKey),
           )
         : Container(
             margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -177,12 +171,17 @@ class _PageHelpIconButtonState extends ConsumerState<PageHelpIconButton> {
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(Icons.help_outline, size: 22, color: Colors.black),
+              icon: const Icon(
+                Icons.help_outline,
+                size: 22,
+                color: Colors.black,
+              ),
               tooltip: 'Show Help',
               padding: const EdgeInsets.all(6),
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              onPressed: () =>
-                  ref.read(hintPreferencesProvider.notifier).toggleHint(widget.pageKey),
+              onPressed: () => ref
+                  .read(hintPreferencesProvider.notifier)
+                  .toggleHint(widget.pageKey),
             ),
           );
   }

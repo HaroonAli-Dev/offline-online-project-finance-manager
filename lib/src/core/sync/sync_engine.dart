@@ -10,13 +10,7 @@ import '../../features/documents/data/attachment_storage_service.dart';
 import '../database/app_database.dart';
 
 /// Represents the overall status of the background synchronization engine.
-enum SyncEngineState {
-  idle,
-  syncing,
-  success,
-  failed,
-  offline,
-}
+enum SyncEngineState { idle, syncing, success, failed, offline }
 
 /// Rich snapshot of the current synchronization state and metrics.
 class SyncStatusSnapshot {
@@ -25,26 +19,73 @@ class SyncStatusSnapshot {
     this.lastSyncedAt,
     this.pendingOutboxCount = 0,
     this.lastError,
+    this.userMessage,
   });
 
   final SyncEngineState state;
   final DateTime? lastSyncedAt;
   final int pendingOutboxCount;
   final String? lastError;
+  final String? userMessage;
 
   SyncStatusSnapshot copyWith({
     SyncEngineState? state,
     DateTime? Function()? lastSyncedAt,
     int? pendingOutboxCount,
     String? Function()? lastError,
+    String? Function()? userMessage,
   }) {
     return SyncStatusSnapshot(
       state: state ?? this.state,
-      lastSyncedAt:
-          lastSyncedAt != null ? lastSyncedAt() : this.lastSyncedAt,
+      lastSyncedAt: lastSyncedAt != null ? lastSyncedAt() : this.lastSyncedAt,
       pendingOutboxCount: pendingOutboxCount ?? this.pendingOutboxCount,
       lastError: lastError != null ? lastError() : this.lastError,
+      userMessage: userMessage != null ? userMessage() : this.userMessage,
     );
+  }
+}
+
+/// Converts backend and transport failures into messages safe for end users.
+String syncFailureMessage(Object error) {
+  final message = error.toString().toLowerCase();
+  final statusCode = _errorStatusCode(error);
+
+  if (statusCode == 402 ||
+      statusCode == 413 ||
+      message.contains('quota') ||
+      message.contains('storage limit') ||
+      message.contains('storage full') ||
+      message.contains('database full') ||
+      message.contains('insufficient storage')) {
+    return 'Sync failed because cloud storage may be full. Your data is saved locally; free space or upgrade Supabase, then try again.';
+  }
+
+  if (statusCode == 401 ||
+      statusCode == 403 ||
+      message.contains('row-level security') ||
+      message.contains('permission denied') ||
+      message.contains('unauthorized') ||
+      message.contains('forbidden')) {
+    return 'Sync failed because cloud access was denied. Check your account and Supabase permissions.';
+  }
+
+  if (message.contains('timeout') ||
+      message.contains('connection') ||
+      message.contains('network') ||
+      message.contains('socket') ||
+      message.contains('host lookup')) {
+    return 'Sync failed because the network is unavailable. Your data is saved locally and will remain pending for retry.';
+  }
+
+  return 'Sync failed. Your data is saved locally and will remain pending for retry.';
+}
+
+int? _errorStatusCode(Object error) {
+  try {
+    final value = (error as dynamic).statusCode;
+    return value is int ? value : int.tryParse(value?.toString() ?? '');
+  } catch (_) {
+    return null;
   }
 }
 
@@ -109,11 +150,7 @@ class SupabaseRemoteSyncClient implements RemoteSyncClient {
 
 /// Offline-first bidirectional synchronization engine for Drift + Supabase.
 class SyncEngine {
-  SyncEngine({
-    required this.database,
-    this.remoteClient,
-    this.storageClient,
-  });
+  SyncEngine({required this.database, this.remoteClient, this.storageClient});
 
   final AppDatabase database;
   RemoteSyncClient? remoteClient;
@@ -144,22 +181,26 @@ class SyncEngine {
   /// Safe to call on all platforms:
   /// - If [userId] is null/empty or [remoteClient] is unconfigured, sync is skipped.
   /// - If network or server is unreachable, backoff is updated on outbox entries without crashing.
-  Future<bool> sync({
-    required String? userId,
-  }) async {
+  Future<bool> sync({required String? userId}) async {
     if (userId == null || userId.trim().isEmpty) {
-      _updateStatus(_status.copyWith(
-        state: SyncEngineState.idle,
-        lastError: () => null,
-      ));
+      _updateStatus(
+        _status.copyWith(
+          state: SyncEngineState.idle,
+          lastError: () => null,
+          userMessage: () => null,
+        ),
+      );
       return false;
     }
 
     final client = remoteClient;
     if (client == null) {
-      _updateStatus(_status.copyWith(
-        state: SyncEngineState.offline,
-      ));
+      _updateStatus(
+        _status.copyWith(
+          state: SyncEngineState.offline,
+          userMessage: () => 'Sync is unavailable because cloud services are not configured or the app is offline.',
+        ),
+      );
       return false;
     }
 
@@ -176,21 +217,27 @@ class SyncEngine {
 
       final pendingCount = await _getPendingOutboxCount();
       final now = DateTime.now().toUtc();
-      _updateStatus(_status.copyWith(
-        state: SyncEngineState.success,
-        lastSyncedAt: () => now,
-        pendingOutboxCount: pendingCount,
-        lastError: () => null,
-      ));
+      _updateStatus(
+        _status.copyWith(
+          state: SyncEngineState.success,
+          lastSyncedAt: () => now,
+          pendingOutboxCount: pendingCount,
+          lastError: () => null,
+          userMessage: () => null,
+        ),
+      );
       return true;
     } catch (e, st) {
       debugPrint('SyncEngine: Error during sync: $e\n$st');
       final pendingCount = await _getPendingOutboxCount();
-      _updateStatus(_status.copyWith(
-        state: SyncEngineState.failed,
-        pendingOutboxCount: pendingCount,
-        lastError: () => e.toString().replaceAll(RegExp(r'^Exception: '), ''),
-      ));
+      _updateStatus(
+        _status.copyWith(
+          state: SyncEngineState.failed,
+          pendingOutboxCount: pendingCount,
+          lastError: () => e.toString().replaceAll(RegExp(r'^Exception: '), ''),
+          userMessage: () => syncFailureMessage(e),
+        ),
+      );
       return false;
     } finally {
       _isSyncing = false;
@@ -208,29 +255,38 @@ class SyncEngine {
     required RemoteSyncClient client,
   }) async {
     final now = DateTime.now().toUtc();
-    final pendingEntries = await (database.select(database.syncOutbox)
-          ..where((t) =>
-              t.nextAttemptAt.isNull() | t.nextAttemptAt.isSmallerOrEqualValue(now))
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
-        .get();
+    final pendingEntries =
+        await (database.select(database.syncOutbox)
+              ..where(
+                (t) =>
+                    t.nextAttemptAt.isNull() |
+                    t.nextAttemptAt.isSmallerOrEqualValue(now),
+              )
+              ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+            .get();
 
     for (final entry in pendingEntries) {
       try {
         await _pushSingleEntry(entry: entry, userId: userId, client: client);
 
         // Remote push succeeded: delete outbox entry atomically
-        await (database.delete(database.syncOutbox)
-              ..where((t) => t.id.equals(entry.id)))
-            .go();
+        await (database.delete(
+          database.syncOutbox,
+        )..where((t) => t.id.equals(entry.id))).go();
       } catch (e) {
         // Failed: record error and compute bounded exponential backoff
         final nextAttemptCount = entry.attemptCount + 1;
-        final backoffSeconds = min(300, pow(2, min(nextAttemptCount, 7)).toInt() * 5);
-        final nextAttemptAt = DateTime.now().toUtc().add(Duration(seconds: backoffSeconds));
+        final backoffSeconds = min(
+          300,
+          pow(2, min(nextAttemptCount, 7)).toInt() * 5,
+        );
+        final nextAttemptAt = DateTime.now().toUtc().add(
+          Duration(seconds: backoffSeconds),
+        );
 
-        await (database.update(database.syncOutbox)
-              ..where((t) => t.id.equals(entry.id)))
-            .write(
+        await (database.update(
+          database.syncOutbox,
+        )..where((t) => t.id.equals(entry.id))).write(
           SyncOutboxCompanion(
             attemptCount: Value(nextAttemptCount),
             nextAttemptAt: Value(nextAttemptAt),
@@ -309,8 +365,14 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pushPerson(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.people)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushPerson(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.people,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -329,7 +391,9 @@ class SyncEngine {
     await client.upsertRecord(table: 'people', record: data);
 
     // Also push associated roles
-    final roles = await (database.select(database.personRoles)..where((t) => t.personId.equals(id))).get();
+    final roles = await (database.select(
+      database.personRoles,
+    )..where((t) => t.personId.equals(id))).get();
     for (final r in roles) {
       await client.upsertRecord(
         table: 'person_roles',
@@ -342,15 +406,22 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pushPersonRole(String roleKey, String userId, RemoteSyncClient client) async {
+  Future<void> _pushPersonRole(
+    String roleKey,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
     // roleKey is formatted as "${personId}_${roleCode}" or personId
     final parts = roleKey.split('_');
     if (parts.length >= 2) {
       final personId = parts[0];
       final roleCode = parts.sublist(1).join('_');
-      final exists = await (database.select(database.personRoles)
-            ..where((t) => t.personId.equals(personId) & t.roleCode.equals(roleCode)))
-          .getSingleOrNull();
+      final exists =
+          await (database.select(database.personRoles)..where(
+                (t) =>
+                    t.personId.equals(personId) & t.roleCode.equals(roleCode),
+              ))
+              .getSingleOrNull();
       if (exists != null) {
         await client.upsertRecord(
           table: 'person_roles',
@@ -364,8 +435,14 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pushSite(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.sites)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushSite(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.sites,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -384,8 +461,14 @@ class SyncEngine {
     await client.upsertRecord(table: 'sites', record: data);
   }
 
-  Future<void> _pushScheme(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.schemes)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushScheme(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.schemes,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -410,8 +493,14 @@ class SyncEngine {
     await client.upsertRecord(table: 'schemes', record: data);
   }
 
-  Future<void> _pushTransaction(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.transactions)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushTransaction(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.transactions,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -436,8 +525,14 @@ class SyncEngine {
     await client.upsertRecord(table: 'transactions', record: data);
   }
 
-  Future<void> _pushExpense(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.expenses)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushExpense(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.expenses,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -460,8 +555,14 @@ class SyncEngine {
     await client.upsertRecord(table: 'expenses', record: data);
   }
 
-  Future<void> _pushVehicle(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.vehicles)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushVehicle(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.vehicles,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -481,8 +582,14 @@ class SyncEngine {
     await client.upsertRecord(table: 'vehicles', record: data);
   }
 
-  Future<void> _pushVehicleLog(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.vehicleLogs)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushVehicleLog(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.vehicleLogs,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -504,8 +611,14 @@ class SyncEngine {
     await client.upsertRecord(table: 'vehicle_logs', record: data);
   }
 
-  Future<void> _pushBill(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.bills)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushBill(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.bills,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -525,8 +638,14 @@ class SyncEngine {
     await client.upsertRecord(table: 'bills', record: data);
   }
 
-  Future<void> _pushProgressUpdate(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.progressUpdates)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushProgressUpdate(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.progressUpdates,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -547,8 +666,14 @@ class SyncEngine {
     await client.upsertRecord(table: 'progress_updates', record: data);
   }
 
-  Future<void> _pushReminder(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.reminders)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushReminder(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.reminders,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -570,7 +695,9 @@ class SyncEngine {
     await client.upsertRecord(table: 'reminders', record: data);
 
     // Also push associated reminder_entity_links
-    final links = await (database.select(database.reminderEntityLinks)..where((t) => t.reminderId.equals(id))).get();
+    final links = await (database.select(
+      database.reminderEntityLinks,
+    )..where((t) => t.reminderId.equals(id))).get();
     for (final link in links) {
       await client.upsertRecord(
         table: 'reminder_entity_links',
@@ -588,8 +715,14 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pushReminderEntityLink(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.reminderEntityLinks)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushReminderEntityLink(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.reminderEntityLinks,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     final data = {
@@ -605,14 +738,21 @@ class SyncEngine {
     await client.upsertRecord(table: 'reminder_entity_links', record: data);
   }
 
-  Future<void> _pushAttachment(String id, String userId, RemoteSyncClient client) async {
-    final row = await (database.select(database.attachments)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<void> _pushAttachment(
+    String id,
+    String userId,
+    RemoteSyncClient client,
+  ) async {
+    final row = await (database.select(
+      database.attachments,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return;
 
     String? storagePath = row.storagePath;
 
     // If attachment has not been uploaded to cloud storage yet, and it is not soft-deleted, upload binary
-    if ((storagePath == null || storagePath.trim().isEmpty) && row.deletedAt == null) {
+    if ((storagePath == null || storagePath.trim().isEmpty) &&
+        row.deletedAt == null) {
       final sClient = storageClient;
       if (sClient != null && row.filePath != null && row.filePath!.isNotEmpty) {
         final bytes = await AttachmentFileHelper.readFileBytes(row.filePath);
@@ -634,11 +774,9 @@ class SyncEngine {
           storagePath = computedPath;
 
           // Update local Drift record with the newly assigned storage_path
-          await (database.update(database.attachments)..where((t) => t.id.equals(id))).write(
-            AttachmentsCompanion(
-              storagePath: Value(storagePath),
-            ),
-          );
+          await (database.update(database.attachments)
+                ..where((t) => t.id.equals(id)))
+              .write(AttachmentsCompanion(storagePath: Value(storagePath)));
         }
       }
     }
@@ -697,19 +835,37 @@ class SyncEngine {
   }) {
     if (localUpdatedAt == null) return true;
     if (remoteUpdatedAt.isAfter(localUpdatedAt)) return true;
-    if (remoteUpdatedAt.isAtSameMomentAs(localUpdatedAt)) return true; // Deterministic tie-break: cloud state
+    if (remoteUpdatedAt.isAtSameMomentAs(localUpdatedAt)) {
+      return true; // Deterministic tie-break: cloud state
+    }
     return false;
   }
 
-  Future<void> _pullPeople(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'people', userId: userId, since: since);
+  Future<void> _pullPeople(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'people',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.people)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.people,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.people).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.people)
+            .insertOnConflictUpdate(
               PeopleCompanion(
                 id: Value(id),
                 fullName: Value(r['full_name'] as String),
@@ -720,7 +876,11 @@ class SyncEngine {
                 isActive: Value(r['is_active'] as bool? ?? true),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -730,15 +890,31 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullSites(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'sites', userId: userId, since: since);
+  Future<void> _pullSites(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'sites',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.sites)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.sites,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.sites).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.sites)
+            .insertOnConflictUpdate(
               SitesCompanion(
                 id: Value(id),
                 name: Value(r['name'] as String),
@@ -749,7 +925,11 @@ class SyncEngine {
                 notes: Value(r['notes'] as String?),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -759,15 +939,31 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullSchemes(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'schemes', userId: userId, since: since);
+  Future<void> _pullSchemes(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'schemes',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.schemes)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.schemes,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.schemes).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.schemes)
+            .insertOnConflictUpdate(
               SchemesCompanion(
                 id: Value(id),
                 schemeCode: Value(r['scheme_code'] as String),
@@ -775,16 +971,30 @@ class SyncEngine {
                 siteId: Value(r['site_id'] as String?),
                 budget: Value((r['budget'] as num?)?.toInt() ?? 0),
                 engineerId: Value(r['engineer_id'] as String?),
-                startDate: Value(r['start_date'] != null ? DateTime.parse(r['start_date'] as String) : null),
-                endDate: Value(r['end_date'] != null ? DateTime.parse(r['end_date'] as String) : null),
+                startDate: Value(
+                  r['start_date'] != null
+                      ? DateTime.parse(r['start_date'] as String)
+                      : null,
+                ),
+                endDate: Value(
+                  r['end_date'] != null
+                      ? DateTime.parse(r['end_date'] as String)
+                      : null,
+                ),
                 status: Value(r['status'] as String? ?? 'initial'),
-                progressPercentage: Value((r['progress_percentage'] as num?)?.toDouble() ?? 0.0),
+                progressPercentage: Value(
+                  (r['progress_percentage'] as num?)?.toDouble() ?? 0.0,
+                ),
                 incompleteReason: Value(r['incomplete_reason'] as String?),
                 result: Value(r['result'] as String?),
                 description: Value(r['description'] as String?),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -794,19 +1004,37 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullTransactions(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'transactions', userId: userId, since: since);
+  Future<void> _pullTransactions(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'transactions',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.transactions)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.transactions,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.transactions).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.transactions)
+            .insertOnConflictUpdate(
               TransactionsCompanion(
                 id: Value(id),
                 transactionCode: Value(r['transaction_code'] as String),
-                transactionDate: Value(DateTime.parse(r['transaction_date'] as String)),
+                transactionDate: Value(
+                  DateTime.parse(r['transaction_date'] as String),
+                ),
                 type: Value(r['type'] as String),
                 personId: Value(r['person_id'] as String?),
                 amount: Value((r['amount'] as num?)?.toInt() ?? 0),
@@ -819,7 +1047,11 @@ class SyncEngine {
                 siteId: Value(r['site_id'] as String?),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -829,15 +1061,31 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullExpenses(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'expenses', userId: userId, since: since);
+  Future<void> _pullExpenses(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'expenses',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.expenses)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.expenses,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.expenses).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.expenses)
+            .insertOnConflictUpdate(
               ExpensesCompanion(
                 id: Value(id),
                 expenseCode: Value(r['expense_code'] as String),
@@ -852,7 +1100,11 @@ class SyncEngine {
                 attachmentPath: Value(r['attachment_path'] as String?),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -862,15 +1114,31 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullVehicles(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'vehicles', userId: userId, since: since);
+  Future<void> _pullVehicles(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'vehicles',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.vehicles)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.vehicles,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.vehicles).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.vehicles)
+            .insertOnConflictUpdate(
               VehiclesCompanion(
                 id: Value(id),
                 vehicleNumber: Value(r['vehicle_number'] as String),
@@ -882,7 +1150,11 @@ class SyncEngine {
                 remarks: Value(r['remarks'] as String?),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -892,29 +1164,53 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullVehicleLogs(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'vehicle_logs', userId: userId, since: since);
+  Future<void> _pullVehicleLogs(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'vehicle_logs',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.vehicleLogs)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.vehicleLogs,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.vehicleLogs).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.vehicleLogs)
+            .insertOnConflictUpdate(
               VehicleLogsCompanion(
                 id: Value(id),
                 vehicleId: Value(r['vehicle_id'] as String),
                 logDate: Value(DateTime.parse(r['log_date'] as String)),
                 logType: Value(r['log_type'] as String),
                 amount: Value((r['amount'] as num?)?.toInt() ?? 0),
-                quantityLiters: Value((r['quantity_liters'] as num?)?.toDouble()),
+                quantityLiters: Value(
+                  (r['quantity_liters'] as num?)?.toDouble(),
+                ),
                 driverId: Value(r['driver_id'] as String?),
                 siteId: Value(r['site_id'] as String?),
                 description: Value(r['description'] as String),
-                odometerReading: Value((r['odometer_reading'] as num?)?.toDouble()),
+                odometerReading: Value(
+                  (r['odometer_reading'] as num?)?.toDouble(),
+                ),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -924,15 +1220,31 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullBills(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'bills', userId: userId, since: since);
+  Future<void> _pullBills(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'bills',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.bills)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.bills,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.bills).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.bills)
+            .insertOnConflictUpdate(
               BillsCompanion(
                 id: Value(id),
                 schemeId: Value(r['scheme_id'] as String),
@@ -944,7 +1256,11 @@ class SyncEngine {
                 remarks: Value(r['remarks'] as String?),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -954,28 +1270,50 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullProgressUpdates(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'progress_updates', userId: userId, since: since);
+  Future<void> _pullProgressUpdates(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'progress_updates',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.progressUpdates)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.progressUpdates,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.progressUpdates).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.progressUpdates)
+            .insertOnConflictUpdate(
               ProgressUpdatesCompanion(
                 id: Value(id),
                 schemeId: Value(r['scheme_id'] as String),
                 siteId: Value(r['site_id'] as String?),
                 status: Value(r['status'] as String),
-                progressPercentage: Value((r['progress_percentage'] as num?)?.toDouble() ?? 0.0),
+                progressPercentage: Value(
+                  (r['progress_percentage'] as num?)?.toDouble() ?? 0.0,
+                ),
                 date: Value(DateTime.parse(r['date'] as String)),
                 incompleteReason: Value(r['incomplete_reason'] as String?),
                 result: Value(r['result'] as String?),
                 remarks: Value(r['remarks'] as String?),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -985,29 +1323,57 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullReminders(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'reminders', userId: userId, since: since);
+  Future<void> _pullReminders(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'reminders',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.reminders)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.reminders,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.reminders).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.reminders)
+            .insertOnConflictUpdate(
               RemindersCompanion(
                 id: Value(id),
                 title: Value(r['title'] as String),
                 description: Value(r['description'] as String?),
-                dueAt: Value(r['due_at'] != null ? DateTime.parse(r['due_at'] as String) : null),
+                dueAt: Value(
+                  r['due_at'] != null
+                      ? DateTime.parse(r['due_at'] as String)
+                      : null,
+                ),
                 priority: Value(r['priority'] as String? ?? 'medium'),
                 isDone: Value(r['is_done'] as bool? ?? false),
-                doneAt: Value(r['done_at'] != null ? DateTime.parse(r['done_at'] as String) : null),
+                doneAt: Value(
+                  r['done_at'] != null
+                      ? DateTime.parse(r['done_at'] as String)
+                      : null,
+                ),
                 schemeId: Value(r['scheme_id'] as String?),
                 siteId: Value(r['site_id'] as String?),
                 remarks: Value(r['remarks'] as String?),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -1017,15 +1383,31 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullReminderEntityLinks(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'reminder_entity_links', userId: userId, since: since);
+  Future<void> _pullReminderEntityLinks(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'reminder_entity_links',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.reminderEntityLinks)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.reminderEntityLinks,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
-        await database.into(database.reminderEntityLinks).insertOnConflictUpdate(
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
+        await database
+            .into(database.reminderEntityLinks)
+            .insertOnConflictUpdate(
               ReminderEntityLinksCompanion(
                 id: Value(id),
                 reminderId: Value(r['reminder_id'] as String),
@@ -1033,7 +1415,11 @@ class SyncEngine {
                 entityId: Value(r['entity_id'] as String),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),
@@ -1043,18 +1429,35 @@ class SyncEngine {
     }
   }
 
-  Future<void> _pullAttachments(String userId, RemoteSyncClient client, DateTime? since) async {
-    final remoteRecords = await client.fetchUpdatedSince(table: 'attachments', userId: userId, since: since);
+  Future<void> _pullAttachments(
+    String userId,
+    RemoteSyncClient client,
+    DateTime? since,
+  ) async {
+    final remoteRecords = await client.fetchUpdatedSince(
+      table: 'attachments',
+      userId: userId,
+      since: since,
+    );
     for (final r in remoteRecords) {
       final id = r['id'] as String;
       final remoteUpdatedAt = DateTime.parse(r['updated_at'] as String);
-      final local = await (database.select(database.attachments)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final local = await (database.select(
+        database.attachments,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      if (local == null || shouldRemoteOverwrite(localUpdatedAt: local.updatedAt, remoteUpdatedAt: remoteUpdatedAt)) {
+      if (local == null ||
+          shouldRemoteOverwrite(
+            localUpdatedAt: local.updatedAt,
+            remoteUpdatedAt: remoteUpdatedAt,
+          )) {
         // Keep existing local filePath if already present on this device
-        final effectiveFilePath = local?.filePath ?? (r['file_path'] as String?);
+        final effectiveFilePath =
+            local?.filePath ?? (r['file_path'] as String?);
 
-        await database.into(database.attachments).insertOnConflictUpdate(
+        await database
+            .into(database.attachments)
+            .insertOnConflictUpdate(
               AttachmentsCompanion(
                 id: Value(id),
                 entityType: Value(r['entity_type'] as String),
@@ -1073,7 +1476,11 @@ class SyncEngine {
                 longitude: Value((r['longitude'] as num?)?.toDouble()),
                 createdAt: Value(DateTime.parse(r['created_at'] as String)),
                 updatedAt: Value(remoteUpdatedAt),
-                deletedAt: Value(r['deleted_at'] != null ? DateTime.parse(r['deleted_at'] as String) : null),
+                deletedAt: Value(
+                  r['deleted_at'] != null
+                      ? DateTime.parse(r['deleted_at'] as String)
+                      : null,
+                ),
                 syncStatus: const Value('synced'),
                 remoteUpdatedAt: Value(remoteUpdatedAt),
                 lastSyncedAt: Value(DateTime.now().toUtc()),

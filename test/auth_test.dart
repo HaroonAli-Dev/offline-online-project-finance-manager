@@ -263,7 +263,10 @@ void main() {
           const ProviderScope(child: MaterialApp(home: LoginScreen())),
         );
 
-        expect(find.text('Finance & Construction Manager'), findsOneWidget);
+        expect(
+          find.text('Offline Project Finance Management App'),
+          findsOneWidget,
+        );
         expect(find.text('Sign in to your account'), findsOneWidget);
         expect(find.byType(TextFormField), findsNWidgets(2)); // email, password
         expect(find.text('Sign In'), findsOneWidget);
@@ -360,9 +363,7 @@ void main() {
     testWidgets(
       'shows LoginScreen when unauthenticated and database is ready',
       (tester) async {
-        await tester.pumpWidget(
-          const StartupApp(),
-        );
+        await tester.pumpWidget(const StartupApp());
 
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 800));
@@ -385,20 +386,16 @@ void main() {
           email: 'worker@rural-site.org',
           rememberMe: true,
         );
-
         await tester.pumpWidget(
           ProviderScope(
-            overrides: [
-              appDatabaseProvider.overrideWithValue(database),
-            ],
             child: StartupApp(
               localSessionService: localSessionService,
+              database: database,
             ),
           ),
         );
 
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 800));
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
         // Login screen must NOT appear
         expect(find.byType(LoginScreen), findsNothing);
@@ -423,12 +420,8 @@ void main() {
 
         await tester.pumpWidget(
           ProviderScope(
-            overrides: [
-              appDatabaseProvider.overrideWithValue(database),
-            ],
-            child: StartupApp(
-              localSessionService: localSessionService,
-            ),
+            overrides: [appDatabaseProvider.overrideWithValue(database)],
+            child: StartupApp(localSessionService: localSessionService),
           ),
         );
 

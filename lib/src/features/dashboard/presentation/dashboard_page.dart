@@ -85,6 +85,26 @@ class DashboardPage extends ConsumerWidget {
                           duration: Duration(seconds: 2),
                         ),
                       );
+                    } else {
+                      final currentStatus = ref.read(syncControllerProvider);
+                      final pendingCount = currentStatus.pendingOutboxCount;
+                      final pendingText = pendingCount == 1
+                          ? '1 item remains pending.'
+                          : '$pendingCount items remain pending.';
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '${currentStatus.userMessage ?? 'Sync could not be completed.'} $pendingText',
+                          ),
+                          duration: const Duration(seconds: 5),
+                          action: SnackBarAction(
+                            label: 'Retry',
+                            onPressed: () => ref
+                                .read(syncControllerProvider.notifier)
+                                .synchronize(),
+                          ),
+                        ),
+                      );
                     }
                   },
           ),

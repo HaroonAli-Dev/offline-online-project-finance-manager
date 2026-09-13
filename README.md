@@ -1,4 +1,4 @@
-# Finance & Construction Manager
+# Offline Project Finance Management App
 
 An **offline-first** Flutter application for managing construction finances, projects, people, vehicles, bills, progress, attachments, and reminders. Core records are stored locally, so normal daily work does not require an internet connection.
 
