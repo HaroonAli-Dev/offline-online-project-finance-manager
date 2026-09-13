@@ -161,6 +161,7 @@ class _AuthGate extends ConsumerStatefulWidget {
 class _AuthGateState extends ConsumerState<_AuthGate> {
   AppDatabase? _database;
   String? _openedForUserId;
+  bool _restoredSessionIsActive = true;
 
   @override
   void initState() {
@@ -195,9 +196,15 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    final isAuthenticated =
-        ref.watch(isAuthenticatedProvider) || widget.restoredSession != null;
     final authState = ref.watch(authStateProvider);
+    ref.listen<AppAuthState>(authStateProvider, (previous, next) {
+      if (previous?.isAuthenticated == true && !next.isAuthenticated) {
+        _restoredSessionIsActive = false;
+      }
+    });
+    final isAuthenticated =
+        authState.isAuthenticated &&
+        (_restoredSessionIsActive || widget.restoredSession == null);
 
     if (!isAuthenticated) {
       // Close DB when user logs out

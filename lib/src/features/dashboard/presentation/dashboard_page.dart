@@ -57,10 +57,24 @@ class DashboardPage extends ConsumerWidget {
         .length;
 
     final syncStatus = ref.watch(syncControllerProvider);
+    final userEmail = ref.watch(currentUserEmailProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        centerTitle: true,
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Dashboard'),
+            if (userEmail != null)
+              Text(
+                userEmail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: syncStatus.state == SyncEngineState.syncing

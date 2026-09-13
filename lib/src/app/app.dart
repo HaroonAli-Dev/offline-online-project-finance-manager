@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/providers/hint_preferences_provider.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
@@ -251,7 +250,7 @@ class _WindowsSidebar extends StatelessWidget {
           // Logo
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: SvgPicture.asset(appLogoAsset, width: 36, height: 36),
+            child: Image.asset(appLogoPngAsset, width: 36, height: 36),
           ),
           const Divider(height: 1),
           Expanded(
