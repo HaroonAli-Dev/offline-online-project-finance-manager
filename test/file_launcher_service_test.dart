@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/core/services/file_launcher_service.dart';
+import 'package:offline_project_finance_manager/src/core/services/file_launcher_service.dart';
 
 void main() {
   group('FileLauncherService safety checks', () {

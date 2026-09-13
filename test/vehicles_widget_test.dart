@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/app/app.dart';
-import 'package:offline_finance_management_app/src/features/expenses/domain/expense_model.dart';
-import 'package:offline_finance_management_app/src/features/expenses/presentation/expenses_providers.dart';
-import 'package:offline_finance_management_app/src/features/people/domain/person_summary.dart';
-import 'package:offline_finance_management_app/src/features/people/domain/role_definition.dart';
-import 'package:offline_finance_management_app/src/features/people/presentation/people_providers.dart';
-import 'package:offline_finance_management_app/src/features/schemes/domain/scheme_model.dart';
-import 'package:offline_finance_management_app/src/features/schemes/presentation/schemes_providers.dart';
-import 'package:offline_finance_management_app/src/features/sites/domain/site_model.dart';
-import 'package:offline_finance_management_app/src/features/sites/presentation/sites_providers.dart';
-import 'package:offline_finance_management_app/src/features/transactions/domain/transaction_model.dart';
-import 'package:offline_finance_management_app/src/features/transactions/presentation/transactions_providers.dart';
-import 'package:offline_finance_management_app/src/features/vehicles/domain/vehicle_model.dart';
-import 'package:offline_finance_management_app/src/features/vehicles/presentation/vehicles_providers.dart';
+import 'package:offline_project_finance_manager/src/app/app.dart';
+import 'package:offline_project_finance_manager/src/features/expenses/domain/expense_model.dart';
+import 'package:offline_project_finance_manager/src/features/expenses/presentation/expenses_providers.dart';
+import 'package:offline_project_finance_manager/src/features/people/domain/person_summary.dart';
+import 'package:offline_project_finance_manager/src/features/people/domain/role_definition.dart';
+import 'package:offline_project_finance_manager/src/features/people/presentation/people_providers.dart';
+import 'package:offline_project_finance_manager/src/features/schemes/domain/scheme_model.dart';
+import 'package:offline_project_finance_manager/src/features/schemes/presentation/schemes_providers.dart';
+import 'package:offline_project_finance_manager/src/features/sites/domain/site_model.dart';
+import 'package:offline_project_finance_manager/src/features/sites/presentation/sites_providers.dart';
+import 'package:offline_project_finance_manager/src/features/transactions/domain/transaction_model.dart';
+import 'package:offline_project_finance_manager/src/features/transactions/presentation/transactions_providers.dart';
+import 'package:offline_project_finance_manager/src/features/vehicles/domain/vehicle_model.dart';
+import 'package:offline_project_finance_manager/src/features/vehicles/presentation/vehicles_providers.dart';
 
 void main() {
   testWidgets('renders the Vehicles screen and vehicle cards', (

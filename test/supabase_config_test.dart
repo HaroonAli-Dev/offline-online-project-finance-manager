@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/core/config/supabase_config.dart';
+import 'package:offline_project_finance_manager/src/core/config/supabase_config.dart';
 
 void main() {
   group('SupabaseConfig', () {

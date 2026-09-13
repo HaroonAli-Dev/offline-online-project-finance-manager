@@ -1,6 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/core/database/app_database.dart';
+import 'package:offline_project_finance_manager/src/core/database/app_database.dart';
 
 void main() {
   test('opens the database and executes a health check', () async {

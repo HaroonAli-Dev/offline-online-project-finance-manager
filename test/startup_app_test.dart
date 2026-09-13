@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/app/startup_app.dart';
+import 'package:offline_project_finance_manager/src/app/startup_app.dart';
 
 void main() {
   testWidgets(

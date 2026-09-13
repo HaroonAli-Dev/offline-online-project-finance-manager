@@ -244,7 +244,7 @@ class _StartupSplash extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Image.asset(
-                    appLogoAsset,
+                    appLogoPngAsset,
                     width: logoSize,
                     height: logoSize,
                     fit: BoxFit.contain,

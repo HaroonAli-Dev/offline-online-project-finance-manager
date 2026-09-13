@@ -1,6 +1,6 @@
 {
-    "name": "Finance & Construction Manager",
-    "short_name": "Finance Manager",
+    "name": "offline_project_finance_manager",
+    "short_name": "offline_project_finance_manager",
     "id": ".",
     "start_url": "./",
     "display": "standalone",

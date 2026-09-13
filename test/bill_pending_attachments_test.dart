@@ -1,12 +1,12 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/core/database/app_database.dart';
-import 'package:offline_finance_management_app/src/features/bills/data/bills_repository.dart';
-import 'package:offline_finance_management_app/src/features/documents/data/attachment_picker_service.dart';
-import 'package:offline_finance_management_app/src/features/documents/data/attachments_repository.dart';
-import 'package:offline_finance_management_app/src/features/documents/domain/attachment_draft.dart';
-import 'package:offline_finance_management_app/src/features/documents/presentation/attachments_panel.dart';
-import 'package:offline_finance_management_app/src/features/schemes/data/schemes_repository.dart';
+import 'package:offline_project_finance_manager/src/core/database/app_database.dart';
+import 'package:offline_project_finance_manager/src/features/bills/data/bills_repository.dart';
+import 'package:offline_project_finance_manager/src/features/documents/data/attachment_picker_service.dart';
+import 'package:offline_project_finance_manager/src/features/documents/data/attachments_repository.dart';
+import 'package:offline_project_finance_manager/src/features/documents/domain/attachment_draft.dart';
+import 'package:offline_project_finance_manager/src/features/documents/presentation/attachments_panel.dart';
+import 'package:offline_project_finance_manager/src/features/schemes/data/schemes_repository.dart';
 import 'package:uuid/uuid.dart';
 
 void main() {

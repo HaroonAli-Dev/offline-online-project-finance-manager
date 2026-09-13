@@ -1,8 +1,8 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/core/database/app_database.dart';
-import 'package:offline_finance_management_app/src/features/people/data/people_repository.dart';
-import 'package:offline_finance_management_app/src/features/transactions/data/transactions_repository.dart';
+import 'package:offline_project_finance_manager/src/core/database/app_database.dart';
+import 'package:offline_project_finance_manager/src/features/people/data/people_repository.dart';
+import 'package:offline_project_finance_manager/src/features/transactions/data/transactions_repository.dart';
 import 'package:uuid/uuid.dart';
 
 void main() {

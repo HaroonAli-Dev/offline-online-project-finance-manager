@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/providers/hint_preferences_provider.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
@@ -13,7 +14,8 @@ import '../features/progress/presentation/progress_page.dart';
 import '../features/reminders/presentation/reminders_page.dart';
 import '../features/vehicles/presentation/vehicles_page.dart';
 
-const appLogoAsset = 'lib/assests/images/logo/logo.png';
+const appLogoAsset = 'lib/assests/logo_svg.svg';
+const appLogoPngAsset = 'lib/assests/logo_256.png';
 
 final appTheme = ThemeData(
   colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B5E20)),
@@ -27,7 +29,7 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return ProviderScope(
       child: MaterialApp(
-        title: 'Finance & Construction Manager',
+        title: 'offline_project_finance_manager',
         debugShowCheckedModeBanner: false,
         theme: appTheme,
         home: const MainNavigationShell(),
@@ -244,11 +246,10 @@ class _WindowsSidebar extends StatelessWidget {
           // Logo
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Image.asset(
+            child: SvgPicture.asset(
               appLogoAsset,
               width: 36,
               height: 36,
-              fit: BoxFit.contain,
             ),
           ),
           const Divider(height: 1),

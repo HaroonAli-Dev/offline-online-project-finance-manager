@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../app/app.dart';
 import '../../../core/config/supabase_config.dart';
 import '../providers/auth_provider.dart';
@@ -97,11 +98,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     children: [
                       // Logo & Header
                       Center(
-                        child: Image.asset(
+                        child: SvgPicture.asset(
                           appLogoAsset,
                           width: 64,
                           height: 64,
-                          fit: BoxFit.contain,
                         ),
                       ),
                       const SizedBox(height: 16),

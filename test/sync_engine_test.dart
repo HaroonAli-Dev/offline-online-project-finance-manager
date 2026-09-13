@@ -1,9 +1,9 @@
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/core/database/app_database.dart';
-import 'package:offline_finance_management_app/src/core/sync/sync_engine.dart';
-import 'package:offline_finance_management_app/src/features/documents/data/attachment_storage_service.dart';
+import 'package:offline_project_finance_manager/src/core/database/app_database.dart';
+import 'package:offline_project_finance_manager/src/core/sync/sync_engine.dart';
+import 'package:offline_project_finance_manager/src/features/documents/data/attachment_storage_service.dart';
 import 'package:uuid/uuid.dart';
 
 /// In-memory mock for [RemoteSyncClient] to simulate Supabase operations and responses.

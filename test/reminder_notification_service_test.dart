@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/features/reminders/services/reminder_notification_service.dart';
+import 'package:offline_project_finance_manager/src/features/reminders/services/reminder_notification_service.dart';
 
 void main() {
   test('notification ID is deterministic for a reminder ID', () {

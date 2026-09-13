@@ -4,7 +4,7 @@ library;
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/features/documents/data/attachment_local_storage.dart';
+import 'package:offline_project_finance_manager/src/features/documents/data/attachment_local_storage.dart';
 
 void main() {
   test('saves and reads identical bytes from IndexedDB', () async {

@@ -17,15 +17,17 @@ class BackupExportDialog extends ConsumerWidget {
         children: [
           Icon(Icons.import_export),
           SizedBox(width: 8),
-          Text('Data Export & Backup'),
+          Expanded(child: Text('Data Export & Backup')),
         ],
       ),
-      content: SizedBox(
-        width: 440,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Text(
               'Export CSV Reports',
               style: Theme.of(context).textTheme.titleSmall
@@ -142,6 +144,7 @@ class BackupExportDialog extends ConsumerWidget {
               },
             ),
           ],
+          ),
         ),
       ),
       actions: [

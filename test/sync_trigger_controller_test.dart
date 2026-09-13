@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:offline_finance_management_app/src/core/sync/sync_trigger_controller.dart';
+import 'package:offline_project_finance_manager/src/core/sync/sync_trigger_controller.dart';
 
 class _FakeConnectivity implements ConnectivitySource {
   final changes = StreamController<List<ConnectivityResult>>.broadcast();
